@@ -2428,7 +2428,7 @@ int main () {
     {
         gmc.generate(r1csPath, pkPath, vkPath);
     }
-    else if (1)
+    else if (0)
     {
         //Given secret key s [512b]
         //P = secp256k1multiply(G, s) [512b]
