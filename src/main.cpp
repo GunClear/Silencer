@@ -1,13 +1,10 @@
-#define NDEBUG  1
-#define DEBUG  1
-
 #include <fstream>
 
-inline void assert_except(bool condition) {
-    if (!condition) {
-        throw std::runtime_error("Assertion failed.");
-    }
-}
+// inline void assert_except(bool condition) {
+//     if (!condition) {
+//         throw std::runtime_error("Assertion failed.");
+//     }
+// }
 
 #include <mutex>
 //#include <libff/common/default_types/ec_pp.hpp> 
@@ -53,6 +50,7 @@ inline void assert_except(bool condition) {
 
 #include "serialize.h"
 #include "crypto/sha256.h"
+#include "GuneroMerkleTree.hpp"
 
 #ifdef CURVE_BN128
     // //bn128_pp
@@ -87,407 +85,12 @@ typedef libff::alt_bn128_pp::Fqe_type curve_Fq2;
 
 using namespace libsnark;
 using namespace libzcash;
-//using namespace gunero;
+using namespace gunero;
 
 std::ostream& operator<<(std::ostream &out, const libff::bit_vector &a);
 std::istream& operator>>(std::istream &in, libff::bit_vector &a);
 std::ostream& operator<<(std::ostream &out, const std::vector<libff::bit_vector> &a);
 std::istream& operator>>(std::istream &in, std::vector<libff::bit_vector> &a);
-
-const signed char p_util_hexdigit[256] =
-{ -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  0,1,2,3,4,5,6,7,8,9,-1,-1,-1,-1,-1,-1,
-  -1,0xa,0xb,0xc,0xd,0xe,0xf,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,0xa,0xb,0xc,0xd,0xe,0xf,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, };
-
-signed char HexDigit(char c)
-{
-    return p_util_hexdigit[(unsigned char)c];
-}
-
-// /** Template base class for fixed-sized opaque blobs. */
-// template<unsigned int BITS>
-// class base_blob
-// {
-// protected:
-//     enum { WIDTH=BITS/8 };
-//     alignas(uint32_t) uint8_t data[WIDTH];
-// public:
-//     base_blob()
-//     {
-//         memset(data, 0, sizeof(data));
-//     }
-
-//     explicit base_blob(const std::vector<unsigned char>& vch);
-
-//     bool IsNull() const
-//     {
-//         for (int i = 0; i < WIDTH; i++)
-//             if (data[i] != 0)
-//                 return false;
-//         return true;
-//     }
-
-//     void SetNull()
-//     {
-//         memset(data, 0, sizeof(data));
-//     }
-
-//     friend inline bool operator==(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) == 0; }
-//     friend inline bool operator!=(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) != 0; }
-//     friend inline bool operator<(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) < 0; }
-
-//     std::string GetHex() const;
-//     void SetHex(const char* psz);
-//     void SetHex(const std::string& str);
-//     std::string ToString() const;
-
-//     unsigned char* begin()
-//     {
-//         return &data[0];
-//     }
-
-//     unsigned char* end()
-//     {
-//         return &data[WIDTH];
-//     }
-
-//     const unsigned char* begin() const
-//     {
-//         return &data[0];
-//     }
-
-//     const unsigned char* end() const
-//     {
-//         return &data[WIDTH];
-//     }
-
-//     unsigned int size() const
-//     {
-//         return sizeof(data);
-//     }
-
-//     unsigned int GetSerializeSize(int nType, int nVersion) const
-//     {
-//         return sizeof(data);
-//     }
-
-//     template<typename Stream>
-//     void Serialize(Stream& s, int nType, int nVersion) const
-//     {
-//         s.write((char*)data, sizeof(data));
-//     }
-
-//     template<typename Stream>
-//     void Unserialize(Stream& s, int nType, int nVersion)
-//     {
-//         s.read((char*)data, sizeof(data));
-//     }
-
-//     friend std::ostream& operator<<(std::ostream &out, const base_blob<BITS> &a)
-//     {
-//         for(int i = 0; i < WIDTH; i++)
-//         {
-//             out << a.data[i];
-//         }
-
-//         return out;
-//     }
-
-//     friend std::istream& operator>>(std::istream &in, base_blob<BITS> &a)
-//     {
-//         for(int i = 0; i < WIDTH; i++)
-//         {
-//             in >> a.data[i];
-//         }
-
-//         return in;
-//     }
-// };
-
-// /** 256-bit opaque blob.
-//  * @note This type is called uint256 for historical reasons only. It is an
-//  * opaque blob of 256 bits and has no integer operations. Use arith_uint256 if
-//  * those are required.
-//  */
-// class uint256 : public base_blob<256> {
-// public:
-//     uint256() {}
-//     uint256(const base_blob<256>& b) : base_blob<256>(b) {}
-//     explicit uint256(const std::vector<unsigned char>& vch) : base_blob<256>(vch) {}
-
-//     /** A cheap hash function that just returns 64 bits from the result, it can be
-//      * used when the contents are considered uniformly random. It is not appropriate
-//      * when the value can easily be influenced from outside as e.g. a network adversary could
-//      * provide values to trigger worst-case behavior.
-//      * @note The result of this function is not stable between little and big endian.
-//      */
-//     uint64_t GetCheapHash() const
-//     {
-//         uint64_t result;
-//         memcpy((void*)&result, (void*)data, 8);
-//         return result;
-//     }
-
-//     /** A more secure, salted hash function.
-//      * @note This hash is not stable between little and big endian.
-//      */
-//     uint64_t GetHash(const uint256& salt) const;
-// };
-
-// /* uint256 from const char *.
-//  * This is a separate function because the constructor uint256(const char*) can result
-//  * in dangerously catching uint256(0).
-//  */
-// inline uint256 uint256S(const char *str)
-// {
-//     uint256 rv;
-//     rv.SetHex(str);
-//     return rv;
-// }
-// /* uint256 from std::string.
-//  * This is a separate function because the constructor uint256(const std::string &str) can result
-//  * in dangerously catching uint256(0) via std::string(const char*).
-//  */
-// inline uint256 uint256S(const std::string& str)
-// {
-//     uint256 rv;
-//     rv.SetHex(str);
-//     return rv;
-// }
-
-// class uint252 {
-// private:
-//     uint256 contents;
-
-// public:
-//     ADD_SERIALIZE_METHODS;
-
-//     template <typename Stream, typename Operation>
-//     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-//         READWRITE(contents);
-
-//         if ((*contents.begin()) & 0xF0) {
-//             throw std::ios_base::failure("spending key has invalid leading bits");
-//         }
-//     }
-
-//     const unsigned char* begin() const
-//     {
-//         return contents.begin();
-//     }
-
-//     const unsigned char* end() const
-//     {
-//         return contents.end();
-//     }
-
-//     uint252() : contents() {};
-//     explicit uint252(const uint256& in) : contents(in) {
-//         if (*contents.begin() & 0xF0) {
-//             throw std::domain_error("leading bits are set in argument given to uint252 constructor");
-//         }
-//     }
-
-//     uint256 inner() const {
-//         return contents;
-//     }
-
-//     friend inline bool operator==(const uint252& a, const uint252& b) { return a.contents == b.contents; }
-// };
-
-// class uint160 {
-// private:
-//     uint256 contents;
-
-// public:
-//     ADD_SERIALIZE_METHODS;
-
-//     template <typename Stream, typename Operation>
-//     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-//         READWRITE(contents);
-
-//         if ((*contents.begin()) & 0xF0) {
-//             throw std::ios_base::failure("spending key has invalid leading bits");
-//         }
-//     }
-
-//     const unsigned char* begin() const
-//     {
-//         return contents.begin();
-//     }
-
-//     const unsigned char* end() const
-//     {
-//         return contents.end();
-//     }
-
-//     uint160() : contents() {};
-//     explicit uint160(const uint256& in) : contents(in) {
-//         if (*contents.begin() & 0xF0) {
-//             throw std::domain_error("leading bits are set in argument given to uint160 constructor");
-//         }
-//     }
-
-//     uint256 inner() const {
-//         return contents;
-//     }
-
-//     friend inline bool operator==(const uint160& a, const uint160& b) { return a.contents == b.contents; }
-// };
-
-template <unsigned int BITS>
-base_blob<BITS>::base_blob(const std::vector<unsigned char>& vch)
-{
-    assert(vch.size() == sizeof(data));
-    memcpy(data, &vch[0], sizeof(data));
-}
-
-template <unsigned int BITS>
-std::string base_blob<BITS>::GetHex() const
-{
-    char psz[sizeof(data) * 2 + 1];
-    for (unsigned int i = 0; i < sizeof(data); i++)
-        sprintf(psz + i * 2, "%02x", data[sizeof(data) - i - 1]);
-    return std::string(psz, psz + sizeof(data) * 2);
-}
-
-template <unsigned int BITS>
-void base_blob<BITS>::SetHex(const char* psz)
-{
-    memset(data, 0, sizeof(data));
-
-    // skip leading spaces
-    while (isspace(*psz))
-        psz++;
-
-    // skip 0x
-    if (psz[0] == '0' && tolower(psz[1]) == 'x')
-        psz += 2;
-
-    // hex string to uint
-    const char* pbegin = psz;
-    while (::HexDigit(*psz) != -1)
-        psz++;
-    psz--;
-    unsigned char* p1 = (unsigned char*)data;
-    unsigned char* pend = p1 + WIDTH;
-    while (psz >= pbegin && p1 < pend) {
-        *p1 = ::HexDigit(*psz--);
-        if (psz >= pbegin) {
-            *p1 |= ((unsigned char)::HexDigit(*psz--) << 4);
-            p1++;
-        }
-    }
-}
-
-template <unsigned int BITS>
-void base_blob<BITS>::SetHex(const std::string& str)
-{
-    SetHex(str.c_str());
-}
-
-template <unsigned int BITS>
-std::string base_blob<BITS>::ToString() const
-{
-    return (GetHex());
-}
-
-// Explicit instantiations for base_blob<160>
-template base_blob<160>::base_blob(const std::vector<unsigned char>&);
-template std::string base_blob<160>::GetHex() const;
-template std::string base_blob<160>::ToString() const;
-template void base_blob<160>::SetHex(const char*);
-template void base_blob<160>::SetHex(const std::string&);
-
-// Explicit instantiations for base_blob<256>
-template base_blob<256>::base_blob(const std::vector<unsigned char>&);
-template std::string base_blob<256>::GetHex() const;
-template std::string base_blob<256>::ToString() const;
-template void base_blob<256>::SetHex(const char*);
-template void base_blob<256>::SetHex(const std::string&);
-
-static void inline HashMix(uint32_t& a, uint32_t& b, uint32_t& c)
-{
-    // Taken from lookup3, by Bob Jenkins.
-    a -= c;
-    a ^= ((c << 4) | (c >> 28));
-    c += b;
-    b -= a;
-    b ^= ((a << 6) | (a >> 26));
-    a += c;
-    c -= b;
-    c ^= ((b << 8) | (b >> 24));
-    b += a;
-    a -= c;
-    a ^= ((c << 16) | (c >> 16));
-    c += b;
-    b -= a;
-    b ^= ((a << 19) | (a >> 13));
-    a += c;
-    c -= b;
-    c ^= ((b << 4) | (b >> 28));
-    b += a;
-}
-
-static void inline HashFinal(uint32_t& a, uint32_t& b, uint32_t& c)
-{
-    // Taken from lookup3, by Bob Jenkins.
-    c ^= b;
-    c -= ((b << 14) | (b >> 18));
-    a ^= c;
-    a -= ((c << 11) | (c >> 21));
-    b ^= a;
-    b -= ((a << 25) | (a >> 7));
-    c ^= b;
-    c -= ((b << 16) | (b >> 16));
-    a ^= c;
-    a -= ((c << 4) | (c >> 28));
-    b ^= a;
-    b -= ((a << 14) | (a >> 18));
-    c ^= b;
-    c -= ((b << 24) | (b >> 8));
-}
-
-uint64_t uint256::GetHash(const uint256& salt) const
-{
-    uint32_t a, b, c;
-    const uint32_t *pn = (const uint32_t*)data;
-    const uint32_t *salt_pn = (const uint32_t*)salt.data;
-    a = b = c = 0xdeadbeef + WIDTH;
-
-    a += pn[0] ^ salt_pn[0];
-    b += pn[1] ^ salt_pn[1];
-    c += pn[2] ^ salt_pn[2];
-    HashMix(a, b, c);
-    a += pn[3] ^ salt_pn[3];
-    b += pn[4] ^ salt_pn[4];
-    c += pn[5] ^ salt_pn[5];
-    HashMix(a, b, c);
-    a += pn[6] ^ salt_pn[6];
-    b += pn[7] ^ salt_pn[7];
-    HashFinal(a, b, c);
-
-    return ((((uint64_t)b) << 32) | c);
-}
-
-uint256 PRF_addr_a_pk(const uint252& a_sk);
-uint256 PRF_addr_sk_enc(const uint252& a_sk);
-uint256 PRF_nf(const uint252& a_sk, const uint256& rho);
-uint256 PRF_pk(const uint252& a_sk, size_t i0, const uint256& h_sig);
-uint256 PRF_rho(const uint252& phi, size_t i0, const uint256& h_sig);
 
 uint256 random_uint256();
 uint252 random_uint252();
@@ -590,41 +193,6 @@ int div_ceil(int numerator, int denominator)
     return res.rem ? (res.quot + 1) : res.quot;
 }
 
-class GuneroMerklePath {
-public:
-    std::vector<std::vector<bool>> authentication_path;
-    std::vector<bool> index;
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(authentication_path);
-        READWRITE(index);
-    }
-
-    GuneroMerklePath() { }
-
-    GuneroMerklePath(std::vector<std::vector<bool>> authentication_path, std::vector<bool> index)
-    : authentication_path(authentication_path), index(index) { }
-
-    friend std::ostream& operator<<(std::ostream &out, const GuneroMerklePath &a)
-    {
-        out << a.authentication_path;
-        out << a.index;
-
-        return out;
-    }
-
-    friend std::istream& operator>>(std::istream &in, GuneroMerklePath &a)
-    {
-        in >> a.authentication_path;
-        in >> a.index;
-
-        return in;
-    }
-};
-
 template<typename FieldT, typename HashT, size_t tree_depth>
 class gunero_merkle_tree_gadget : gadget<FieldT> {
 private:
@@ -688,40 +256,15 @@ public:
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class guneromembership_gadget : public gadget<FieldT> {
 public:
-    //const size_t digest_len;
-    // protoboard<FieldT> mpb;
     digest_variable<FieldT> root_digest;
     digest_variable<FieldT> leaf_digest;
-    // merkle_authentication_path_variable<FieldT, HashT> path_var;
-    // pb_variable_array<FieldT> address_bits_va;
-    //merkle_tree_check_read_gadget<FieldT, HashT> ml;
     gunero_merkle_tree_gadget<FieldT, HashT, tree_depth> ml;
 
-    // guneromembership_gadget()
-    //     : gadget<FieldT>(pb, "guneromembership_gadget")
-    //     , digest_len(HashT::get_digest_len())
-    //     , leaf_digest(pb, digest_len, "input_block")
-    //     , root_digest(pb, digest_len, "output_digest")
-    //     , path_var(pb, tree_depth, "path_var")
-    //     , address_bits_va(pb, tree_depth, "address_bits")
-    //     , ml(pb, tree_depth, address_bits_va, leaf_digest, root_digest, path_var, ONE, "ml")
-    // {
-    //     // pb_variable_array<FieldT> address_bits_va;
-    //     // address_bits_va.allocate(pb, tree_depth, "address_bits");
-    //     //digest_variable<FieldT> leaf_digest(pb, digest_len, "input_block");
-    //     //digest_variable<FieldT> root_digest(pb, digest_len, "output_digest");
-    //     //merkle_tree_check_read_gadget<FieldT, HashT> ml(pb, tree_depth, address_bits_va, leaf_digest, root_digest, path_var, ONE, "ml");
-    // }
     guneromembership_gadget(protoboard<FieldT>& pb)
         : gadget<FieldT>(pb, "guneromembership_gadget")
-        // , digest_len(HashT::get_digest_len())
-        , root_digest(pb, /*digest_len*/HashT::get_digest_len(), "output_digest")
-        // , mpb(pb)
-        , leaf_digest(pb, /*digest_len*/HashT::get_digest_len(), "input_block")
-        // , path_var(pb, tree_depth, "path_var")
-        // , address_bits_va(pb, tree_depth, "address_bits")
-        // , ml(pb, tree_depth, address_bits_va, leaf_digest, root_digest, path_var, ONE, "ml")
-        , ml(pb, leaf_digest, root_digest, /*path_var,*/ ONE, "ml")
+        , root_digest(pb, HashT::get_digest_len(), "output_digest")
+        , leaf_digest(pb, HashT::get_digest_len(), "input_block")
+        , ml(pb, leaf_digest, root_digest, ONE, "ml")
     {
         // The verification inputs are all bit-strings of various
         // lengths (256-bit digests and 64-bit integers) and so we
@@ -730,12 +273,6 @@ public:
         // verification is.)
         // zk_packed_inputs.allocate(pb, verifying_field_element_size());
         pb.set_input_sizes(verifying_field_element_size());
-
-        // pb_variable_array<FieldT> address_bits_va;
-        // address_bits_va.allocate(pb, tree_depth, "address_bits");
-        //digest_variable<FieldT> leaf_digest(pb, digest_len, "input_block");
-        //digest_variable<FieldT> root_digest(pb, digest_len, "output_digest");
-        //merkle_tree_check_read_gadget<FieldT, HashT> ml(pb, tree_depth, address_bits_va, leaf_digest, root_digest, path_var, ONE, "ml");
     }
 
     ~guneromembership_gadget()
@@ -745,20 +282,6 @@ public:
 
     static size_t verifying_input_bit_size() {
         size_t acc = 0;
-
-        // acc += 256; // the merkle root (anchor)
-        // acc += 256; // h_sig
-        // for (size_t i = 0; i < NumInputs; i++) {
-        //     acc += 256; // nullifier
-        //     acc += 256; // mac
-        // }
-        // for (size_t i = 0; i < NumOutputs; i++) {
-        //     acc += 256; // new commitment
-        // }
-        // acc += 64; // vpub_old
-        // acc += 64; // vpub_new
-
-        // return acc;
 
         acc += HashT::get_digest_len(); // the merkle root (anchor) => libff::bit_vector root(digest_len);
 
@@ -2601,192 +2124,6 @@ ProofVerifier ProofVerifier::Disabled() {
     return ProofVerifier(false);
 }
 
-class ViewingKey : public uint256 {
-public:
-    ViewingKey(uint256 sk_enc) : uint256(sk_enc) { }
-
-    uint256 pk_enc();
-};
-
-const size_t SerializedPaymentAddressSize = 64;
-const size_t SerializedSpendingKeySize = 32;
-
-class PaymentAddress {
-public:
-    uint256 a_pk;
-    uint256 pk_enc;
-
-    PaymentAddress() : a_pk(), pk_enc() { }
-    PaymentAddress(uint256 a_pk, uint256 pk_enc) : a_pk(a_pk), pk_enc(pk_enc) { }
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(a_pk);
-        READWRITE(pk_enc);
-    }
-
-    //! Get the 256-bit SHA256d hash of this payment address.
-    uint256 GetHash() const;
-
-    friend inline bool operator==(const PaymentAddress& a, const PaymentAddress& b) {
-        return a.a_pk == b.a_pk && a.pk_enc == b.pk_enc;
-    }
-    friend inline bool operator<(const PaymentAddress& a, const PaymentAddress& b) {
-        return (a.a_pk < b.a_pk ||
-                (a.a_pk == b.a_pk && a.pk_enc < b.pk_enc));
-    }
-};
-
-// class SpendingKey : public uint252 {
-// public:
-//     SpendingKey() : uint252() { }
-//     SpendingKey(uint252 a_sk) : uint252(a_sk) { }
-
-//     static SpendingKey random();
-
-//     ViewingKey viewing_key() const;
-//     PaymentAddress address() const;
-// };
-
-// class Note {
-// public:
-//     uint256 a_pk;
-//     uint64_t value;
-//     uint256 rho;
-//     uint256 r;
-
-//     Note(uint256 a_pk, uint64_t value, uint256 rho, uint256 r)
-//         : a_pk(a_pk), value(value), rho(rho), r(r) {}
-
-//     Note();
-
-//     uint256 cm() const;
-//     uint256 nullifier(const SpendingKey& a_sk) const;
-// };
-
-// class JSOutput {
-// public:
-//     PaymentAddress addr;
-//     uint64_t value;
-//     boost::array<unsigned char, ZC_MEMO_SIZE> memo = {{0xF6}};  // 0xF6 is invalid UTF8 as per spec, rest of array is 0x00
-
-//     JSOutput();
-//     JSOutput(PaymentAddress addr, uint64_t value) : addr(addr), value(value) { }
-
-//     Note note(const uint252& phi, const uint256& r, size_t i, const uint256& h_sig) const;
-// };
-
-// Note JSOutput::note(const uint252& phi, const uint256& r, size_t i, const uint256& h_sig) const {
-//     uint256 rho = PRF_rho(phi, i, h_sig);
-
-//     return Note(addr.a_pk, value, rho, r);
-// }
-
-// class NotePlaintext {
-// public:
-//     uint64_t value = 0;
-//     uint256 rho;
-//     uint256 r;
-//     boost::array<unsigned char, ZC_MEMO_SIZE> memo;
-
-//     NotePlaintext() {}
-
-//     NotePlaintext(const Note& note, boost::array<unsigned char, ZC_MEMO_SIZE> memo);
-
-//     Note note(const PaymentAddress& addr) const;
-
-//     ADD_SERIALIZE_METHODS;
-
-//     template <typename Stream, typename Operation>
-//     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-//         unsigned char leadingByte = 0x00;
-//         READWRITE(leadingByte);
-
-//         if (leadingByte != 0x00) {
-//             throw std::ios_base::failure("lead byte of NotePlaintext is not recognized");
-//         }
-
-//         READWRITE(value);
-//         READWRITE(rho);
-//         READWRITE(r);
-//         READWRITE(memo);
-//     }
-
-//     static NotePlaintext decrypt(const ZCNoteDecryption& decryptor,
-//                                  const ZCNoteDecryption::Ciphertext& ciphertext,
-//                                  const uint256& ephemeralKey,
-//                                  const uint256& h_sig,
-//                                  unsigned char nonce
-//                                 );
-
-//     ZCNoteEncryption::Ciphertext encrypt(ZCNoteEncryption& encryptor,
-//                                          const uint256& pk_enc
-//                                         ) const;
-// };
-
-uint256 PRF(bool a, bool b, bool c, bool d,
-            const uint252& x,
-            const uint256& y)
-{
-    uint256 res;
-    unsigned char blob[64];
-
-    memcpy(&blob[0], x.begin(), 32);
-    memcpy(&blob[32], y.begin(), 32);
-
-    blob[0] &= 0x0F;
-    blob[0] |= (a ? 1 << 7 : 0) | (b ? 1 << 6 : 0) | (c ? 1 << 5 : 0) | (d ? 1 << 4 : 0);
-
-    CSHA256 hasher;
-    hasher.Write(blob, 64);
-    hasher.FinalizeNoPadding(res.begin());
-
-    return res;
-}
-
-uint256 PRF_addr(const uint252& a_sk, unsigned char t)
-{
-    uint256 y;
-    *(y.begin()) = t;
-
-    return PRF(1, 1, 0, 0, a_sk, y);
-}
-
-uint256 PRF_addr_a_pk(const uint252& a_sk)
-{
-    return PRF_addr(a_sk, 0);
-}
-
-uint256 PRF_addr_sk_enc(const uint252& a_sk)
-{
-    return PRF_addr(a_sk, 1);
-}
-
-uint256 PRF_nf(const uint252& a_sk, const uint256& rho)
-{
-    return PRF(1, 1, 1, 0, a_sk, rho);
-}
-
-uint256 PRF_pk(const uint252& a_sk, size_t i0, const uint256& h_sig)
-{
-    if ((i0 != 0) && (i0 != 1)) {
-        throw std::domain_error("PRF_pk invoked with index out of bounds");
-    }
-
-    return PRF(0, i0, 0, 0, a_sk, h_sig);
-}
-
-uint256 PRF_rho(const uint252& phi, size_t i0, const uint256& h_sig)
-{
-    if ((i0 != 0) && (i0 != 1)) {
-        throw std::domain_error("PRF_rho invoked with index out of bounds");
-    }
-
-    return PRF(0, i0, 1, 0, phi, h_sig);
-}
-
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class GuneroMembershipCircuit
 {
@@ -2869,10 +2206,7 @@ public:
 
     void makeTestVariables(
         GuneroMerklePath& p_path,
-        // size_t& address,
-        // libff::bit_vector& address_bits,
         libff::bit_vector& leaf,
-        // std::vector<merkle_authentication_node>& path,
         libff::bit_vector& root
     )
     {
@@ -2950,10 +2284,6 @@ public:
             guneromembership_gadget<FieldT, BaseT, HashT, tree_depth> g(pb);
             g.load_r1cs_constraints();
             g.generate_r1cs_witness(
-                // address,
-                // address_bits,
-                // leaf,
-                // path
                 path,
                 leaf
             );
@@ -3081,41 +2411,42 @@ int main () {
 
     GuneroMembershipCircuit<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, SPARSE_MERKLE_TREE_DEPTH> gmc;
 
-    std::string r1csPath = "/home/sean/Gunero/build/src/r1cs.bin";
-    std::string pkPath = "/home/sean/Gunero/build/src/pk.bin";
-    std::string vkPath = "/home/sean/Gunero/build/src/vk.bin";
+    std::string r1csPath = "/home/sean/Silencer/build/src/r1cs.bin";
+    std::string pkPath = "/home/sean/Silencer/build/src/pk.bin";
+    std::string vkPath = "/home/sean/Silencer/build/src/vk.bin";
 
-    std::string addressPath = "/home/sean/Gunero/build/src/p_address.bin";
-    std::string leafPath = "/home/sean/Gunero/build/src/p_leaf.bin";
-    std::string pathPath = "/home/sean/Gunero/build/src/p_path.bin";
-    std::string rootPath = "/home/sean/Gunero/build/src/p_root.bin";
-    std::string proofPath = "/home/sean/Gunero/build/src/proof.bin";
+    std::string addressPath = "/home/sean/Silencer/build/src/p_address.bin";
+    std::string leafPath = "/home/sean/Silencer/build/src/p_leaf.bin";
+    std::string pathPath = "/home/sean/Silencer/build/src/p_path.bin";
+    std::string rootPath = "/home/sean/Silencer/build/src/p_root.bin";
+    std::string proofPath = "/home/sean/Silencer/build/src/proof.bin";
 
     /* generate circuit */
     libff::print_header("Gunero Generator");
 
-    if (1)
+    if (0)
     {
         gmc.generate(r1csPath, pkPath, vkPath);
     }
     else if (1)
     {
-        // size_t address;
-        // libff::bit_vector address_bits;
+        //Given secret key s [512b]
+        //P = secp256k1multiply(G, s) [512b]
+        //A = right(keccak256compress(P), 20) [160b]
+        //leaf = keccak256compress(A, status)
+        libff::bit_vector secretKey;
+        libff::bit_vector account;
+        libff::bit_vector status;
         libff::bit_vector leaf;
-        // std::vector<merkle_authentication_node> path;
         libff::bit_vector root;
         GuneroMerklePath path;
 
-        // gmc.makeTestVariables(address, address_bits, leaf, path, root);
         gmc.makeTestVariables(path, leaf, root);
 
-        // saveToFile(addressPath, address);
         saveToFile(leafPath, leaf);
         saveToFile(pathPath, path);
         saveToFile(rootPath, root);
 
-        // ZCProof proof = gmc.prove(root, address, address_bits, leaf, path, pkPath);
         ZCProof proof = gmc.prove(root, path, leaf, pkPath);
 
         saveToFile(proofPath, proof);
