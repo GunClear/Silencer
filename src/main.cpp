@@ -42,6 +42,7 @@
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 
+#include <zcash/util.h>
 #include <zcash/Note.hpp>
 #include <zcash/IncrementalMerkleTree.hpp>
 
@@ -81,7 +82,6 @@ typedef libff::alt_bn128_pp::Fp_type curve_Fr;
 typedef libff::alt_bn128_pp::Fq_type curve_Fq;
 typedef libff::alt_bn128_pp::Fqe_type curve_Fq2;
 #endif
-
 
 using namespace libsnark;
 using namespace libzcash;
@@ -203,8 +203,8 @@ private:
 public:
     gunero_merkle_tree_gadget(
         protoboard<FieldT>& pb,
-        digest_variable<FieldT> leaf,
-        digest_variable<FieldT> root,
+        digest_variable<FieldT>& leaf,
+        digest_variable<FieldT>& root,
         const pb_variable<FieldT>& enforce,
         const std::string &annotation_prefix
     ) : gadget<FieldT>(pb, annotation_prefix) {
@@ -256,23 +256,62 @@ public:
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class guneromembership_gadget : public gadget<FieldT> {
 public:
-    digest_variable<FieldT> root_digest;
-    digest_variable<FieldT> leaf_digest;
-    gunero_merkle_tree_gadget<FieldT, HashT, tree_depth> ml;
+    // Verifier inputs
+    pb_variable_array<FieldT> zk_packed_inputs;
+    pb_variable_array<FieldT> zk_unpacked_inputs;
+    std::shared_ptr<multipacking_gadget<FieldT>> unpacker;
+
+    std::shared_ptr<digest_variable<FieldT>> zk_merkle_root;
+
+    // Aux inputs
+    pb_variable<FieldT> ZERO;
+    std::shared_ptr<digest_variable<FieldT>> leaf_digest;
+    std::shared_ptr<gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>> witness_input;
 
     guneromembership_gadget(protoboard<FieldT>& pb)
         : gadget<FieldT>(pb, "guneromembership_gadget")
-        , root_digest(pb, HashT::get_digest_len(), "output_digest")
-        , leaf_digest(pb, HashT::get_digest_len(), "input_block")
-        , ml(pb, leaf_digest, root_digest, ONE, "ml")
     {
-        // The verification inputs are all bit-strings of various
-        // lengths (256-bit digests and 64-bit integers) and so we
-        // pack them into as few field elements as possible. (The
-        // more verification inputs you have, the more expensive
-        // verification is.)
-        // zk_packed_inputs.allocate(pb, verifying_field_element_size());
-        pb.set_input_sizes(verifying_field_element_size());
+        // Verifier inputs
+        {
+            // The verification inputs are all bit-strings of various
+            // lengths (256-bit digests and 64-bit integers) and so we
+            // pack them into as few field elements as possible. (The
+            // more verification inputs you have, the more expensive
+            // verification is.)
+            zk_packed_inputs.allocate(pb, verifying_field_element_size());
+            pb.set_input_sizes(verifying_field_element_size());
+
+            alloc_uint256(zk_unpacked_inputs, zk_merkle_root);
+
+            assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
+
+            // This gadget will ensure that all of the inputs we provide are
+            // boolean constrained.
+            unpacker.reset(new multipacking_gadget<FieldT>(
+                pb,
+                zk_unpacked_inputs,
+                zk_packed_inputs,
+                FieldT::capacity(),
+                "unpacker"
+            ));
+        }
+
+        // We need a constant "zero" variable in some contexts. In theory
+        // it should never be necessary, but libsnark does not synthesize
+        // optimal circuits.
+        // 
+        // The first variable of our constraint system is constrained
+        // to be one automatically for us, and is known as `ONE`.
+        ZERO.allocate(pb);
+
+        leaf_digest.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+        witness_input.reset(new gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>(
+            pb,
+            *leaf_digest,
+            *zk_merkle_root,
+            ONE,
+            "witness_input"));
     }
 
     ~guneromembership_gadget()
@@ -292,27 +331,27 @@ public:
         return div_ceil(verifying_input_bit_size(), FieldT::capacity());
     }
 
-    void load_r1cs_constraints()
-    {
-        libff::print_header("Gunero load constraints");
+    // void load_r1cs_constraints()
+    // {
+    //     libff::print_header("Gunero load constraints");
 
-        // path_var.generate_r1cs_constraints();
-        ml.generate_r1cs_constraints();
+    //     // path_var.generate_r1cs_constraints();
+    //     merkle_tree->generate_r1cs_constraints();
 
-        // const r1cs_constraint_system<FieldT> constraint_system = pb.get_constraint_system();
+    //     // const r1cs_constraint_system<FieldT> constraint_system = pb.get_constraint_system();
 
-        // r1cs_constraint_system<FieldT> constraint_system;
-        // loadFromFile(r1csPath, mpb.constraint_system);
+    //     // r1cs_constraint_system<FieldT> constraint_system;
+    //     // loadFromFile(r1csPath, mpb.constraint_system);
 
-        printf("\n"); libff::print_indent(); libff::print_mem("after load"); libff::print_time("after load");
+    //     printf("\n"); libff::print_indent(); libff::print_mem("after load"); libff::print_time("after load");
 
-        // r1cs_ppzksnark_keypair<BaseT> keypair = r1cs_ppzksnark_generator<BaseT>(constraint_system);
+    //     // r1cs_ppzksnark_keypair<BaseT> keypair = r1cs_ppzksnark_generator<BaseT>(constraint_system);
 
-        // saveToFile(pkPath, keypair.pk);
-        // saveToFile(vkPath, keypair.vk);
+    //     // saveToFile(pkPath, keypair.pk);
+    //     // saveToFile(vkPath, keypair.vk);
 
-        // printf("\n"); libff::print_indent(); libff::print_mem("after constraints"); libff::print_time("after constraints");
-    }
+    //     // printf("\n"); libff::print_indent(); libff::print_mem("after constraints"); libff::print_time("after constraints");
+    // }
 
     void generate_r1cs_constraints(
         const std::string& r1csPath,
@@ -321,35 +360,68 @@ public:
     {
         libff::print_header("Gunero constraints");
 
-        // path_var.generate_r1cs_constraints();
-        ml.generate_r1cs_constraints();
+        // The true passed here ensures all the inputs
+        // are boolean constrained.
+        unpacker->generate_r1cs_constraints(true);
 
-        const r1cs_constraint_system<FieldT> constraint_system = this->pb.get_constraint_system();
+        // Constrain `ZERO`
+        generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
 
-        saveToFile(r1csPath, constraint_system);
+        // Constrain bitness of leaf_digest
+        leaf_digest->generate_r1cs_constraints();
 
-        printf("\n"); libff::print_indent(); libff::print_mem("after generator"); libff::print_time("after generator");
+        // Constrain bitness of merkle_tree
+        witness_input->generate_r1cs_constraints();
 
-        r1cs_ppzksnark_keypair<BaseT> keypair = r1cs_ppzksnark_generator<BaseT>(constraint_system);
+        // // Perform the critical check
+        // {
+        //     // linear_combination<FieldT> left_side = packed_addition(zk_vpub_old);
+        //     // left_side = left_side + packed_addition(zk_input_notes[i]->value);
 
-        saveToFile(pkPath, keypair.pk);
-        saveToFile(vkPath, keypair.vk);
+        //     // linear_combination<FieldT> right_side = packed_addition(zk_vpub_new);
+        //     // right_side = right_side + packed_addition(zk_output_notes[i]->value);
+
+        //     // Ensure that both sides are equal
+        //     this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
+        //         1,
+        //         zk_merkle_root,
+        //         merkle_tree[CARP]
+        //     ));
+        // }
+
+        {
+            const r1cs_constraint_system<FieldT> constraint_system = this->pb.get_constraint_system();
+
+            if (r1csPath.length() > 0)
+            {
+                saveToFile(r1csPath, constraint_system);
+            }
+
+            printf("\n"); libff::print_indent(); libff::print_mem("after generator"); libff::print_time("after generator");
+
+            r1cs_ppzksnark_keypair<BaseT> keypair = r1cs_ppzksnark_generator<BaseT>(constraint_system);
+
+            if (pkPath.length() > 0)
+            {
+                saveToFile(pkPath, keypair.pk);
+            }
+            if (vkPath.length() > 0)
+            {
+                saveToFile(vkPath, keypair.vk);
+            }
+        }
 
         printf("\n"); libff::print_indent(); libff::print_mem("after constraints"); libff::print_time("after constraints");
     }
 
     static r1cs_primary_input<FieldT> witness_map(
         const libff::bit_vector& root
-        // const uint256& h_sig,
-        // const uint256& macs,
-        // const uint256& nullifiers,
-        // const uint256& commitments,
-        // uint64_t vpub_old,
-        // uint64_t vpub_new
     ) {
-        std::vector<bool> verify_inputs(root);
+        std::vector<bool> verify_inputs;
 
-        // insert_uint256(verify_inputs, rootHash);
+        verify_inputs.insert(verify_inputs.end(), root.begin(), root.end());
+        
+        // insert_uint256(verify_inputs, rt);
         // insert_uint256(verify_inputs, h_sig);
         
         // // for (size_t i = 0; i < NumInputs; i++) {
@@ -372,19 +444,47 @@ public:
 
     void generate_r1cs_witness(
         const libff::bit_vector& root,
-        const GuneroMerklePath& path,
-        // const size_t address,
-        // const libff::bit_vector& address_bits,
-        const libff::bit_vector& leaf
-        // const std::vector<merkle_authentication_node>& path
+        const libff::bit_vector& leaf,
+        const GuneroMerklePath& path
     )
     {
-        root_digest.generate_r1cs_witness(root);
-        // address_bits_va.fill_with_bits(this->pb, address_bits);
-        // assert(address_bits_va.get_field_element_from_bits(this->pb).as_ulong() == address);
-        leaf_digest.generate_r1cs_witness(leaf);
-        // path_var.generate_r1cs_witness(address, path);
-        ml.generate_r1cs_witness(path);
+        // Witness `zero`
+        this->pb.val(ZERO) = FieldT::zero();
+
+        // zk_merkle_root->generate_r1cs_witness(root);
+        // Witness rt. This is not a sanity check.
+        //
+        // This ensures the read gadget constrains
+        // the intended root in the event that
+        // both inputs are zero-valued.
+        zk_merkle_root->bits.fill_with_bits(
+            this->pb,
+            root
+        );
+
+        // leaf_digest->generate_r1cs_witness(leaf);
+        // Witness leaf
+        leaf_digest->bits.fill_with_bits(
+            this->pb,
+            leaf
+        );
+
+        witness_input->generate_r1cs_witness(path);
+
+        // [SANITY CHECK] Ensure that the intended root
+        // was witnessed by the inputs, even if the read
+        // gadget overwrote it. This allows the prover to
+        // fail instead of the verifier, in the event that
+        // the roots of the inputs do not match the
+        // treestate provided to the proving API.
+        zk_merkle_root->bits.fill_with_bits(
+            this->pb,
+            root
+        );
+
+        // This happens last, because only by now are all the
+        // verifier inputs resolved.
+        unpacker->generate_r1cs_witness_from_bits();
     }
 
     // void verify(
@@ -404,7 +504,7 @@ public:
     //     /* make sure that read checker didn't accidentally overwrite anything */
     //     // address_bits_va.fill_with_bits(this->pb, address_bits);
     //     // leaf_digest.generate_r1cs_witness(leaf);
-    //     root_digest.generate_r1cs_witness(root);
+    //     zk_merkle_root.generate_r1cs_witness(root);
     //     assert(this->pb.is_satisfied());
 
     //     const size_t num_constraints = this->pb.num_constraints();
@@ -412,6 +512,14 @@ public:
     //     assert(num_constraints == expected_constraints);
     //     printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
     // }
+
+    void alloc_uint256(
+        pb_variable_array<FieldT>& packed_into,
+        std::shared_ptr<digest_variable<FieldT>>& var
+    ) {
+        var.reset(new digest_variable<FieldT>(this->pb, 256, ""));
+        packed_into.insert(packed_into.end(), var->bits.begin(), var->bits.end());
+    }
 };
 
 // class PaymentAddress {
@@ -932,407 +1040,341 @@ public:
     }
 };
 
-// template <size_t Depth, typename Hash>
-// class GuneroMerkleTreeWitness {
-// friend class GuneroMerkleTree<Depth, Hash>;
+// template<typename FieldT, typename HashT, size_t tree_depth>
+// class gunerotransfer_gadget : gadget<FieldT> {
+// private:
+//     // Verifier inputs
+//     pb_variable_array<FieldT> zk_packed_inputs;
+//     pb_variable_array<FieldT> zk_unpacked_inputs;
+//     std::shared_ptr<multipacking_gadget<FieldT>> unpacker;
+
+//     std::shared_ptr<digest_variable<FieldT>> zk_merkle_root;
+//     std::shared_ptr<digest_variable<FieldT>> zk_h_sig;
+//     std::shared_ptr<digest_variable<FieldT>> zk_input_nullifiers;
+//     std::shared_ptr<digest_variable<FieldT>> zk_input_macs;
+//     std::shared_ptr<digest_variable<FieldT>> zk_output_commitments;
+//     pb_variable_array<FieldT> zk_vpub_old;
+//     pb_variable_array<FieldT> zk_vpub_new;
+
+//     // Aux inputs
+//     pb_variable<FieldT> ZERO;
+//     std::shared_ptr<digest_variable<FieldT>> zk_phi;
+//     pb_variable_array<FieldT> zk_total_uint64;
+
+//     // Input note gadgets
+//     std::shared_ptr<input_note_gadget<FieldT, HashT, tree_depth>> zk_input_notes;
+//     std::shared_ptr<PRF_pk_gadget<FieldT>> zk_mac_authentication;
+
+//     // Output note gadgets
+//     std::shared_ptr<output_note_gadget<FieldT>> zk_output_notes;
 
 // public:
-//     // Required for Unserialize()
-//     GuneroMerkleTreeWitness() {}
+//     gunerotransfer_gadget(protoboard<FieldT> &pb) : gadget<FieldT>(pb) {
+//         // Verification
+//         {
+//             // The verification inputs are all bit-strings of various
+//             // lengths (256-bit digests and 64-bit integers) and so we
+//             // pack them into as few field elements as possible. (The
+//             // more verification inputs you have, the more expensive
+//             // verification is.)
+//             zk_packed_inputs.allocate(pb, verifying_field_element_size());
+//             pb.set_input_sizes(verifying_field_element_size());
 
-//     GuneroMerklePath path() const {
-//         return tree.path(partial_path());
+//             alloc_uint256(zk_unpacked_inputs, zk_merkle_root);
+//             alloc_uint256(zk_unpacked_inputs, zk_h_sig);
+
+//             // for (size_t i = 0; i < NumInputs; i++) {
+//                 alloc_uint256(zk_unpacked_inputs, zk_input_nullifiers);
+//                 alloc_uint256(zk_unpacked_inputs, zk_input_macs);
+//             // }
+
+//             // for (size_t i = 0; i < NumOutputs; i++) {
+//                 alloc_uint256(zk_unpacked_inputs, zk_output_commitments);
+//             // }
+
+//             alloc_uint64(zk_unpacked_inputs, zk_vpub_old);
+//             alloc_uint64(zk_unpacked_inputs, zk_vpub_new);
+
+//             assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
+
+//             // This gadget will ensure that all of the inputs we provide are
+//             // boolean constrained.
+//             unpacker.reset(new multipacking_gadget<FieldT>(
+//                 pb,
+//                 zk_unpacked_inputs,
+//                 zk_packed_inputs,
+//                 FieldT::capacity(),
+//                 "unpacker"
+//             ));
+//         }
+
+//         // We need a constant "zero" variable in some contexts. In theory
+//         // it should never be necessary, but libsnark does not synthesize
+//         // optimal circuits.
+//         // 
+//         // The first variable of our constraint system is constrained
+//         // to be one automatically for us, and is known as `ONE`.
+//         ZERO.allocate(pb);
+
+//         zk_phi.reset(new digest_variable<FieldT>(pb, 252, ""));
+
+//         zk_total_uint64.allocate(pb, 64);
+
+//         // for (size_t i = 0; i < NumInputs; i++) {
+//             // Input note gadget for commitments, macs, nullifiers,
+//             // and spend authority.
+//             zk_input_notes.reset(new input_note_gadget<FieldT, HashT,  tree_depth>(
+//                 pb,
+//                 ZERO,
+//                 zk_input_nullifiers,
+//                 *zk_merkle_root
+//             ));
+
+//             // The input keys authenticate h_sig to prevent
+//             // malleability.
+//             zk_mac_authentication.reset(new PRF_pk_gadget<FieldT>(
+//                 pb,
+//                 ZERO,
+//                 zk_input_notes->a_sk->bits,
+//                 zk_h_sig->bits,
+//                 false,//i ? true : false,
+//                 zk_input_macs
+//             ));
+//         // }
+
+//         // for (size_t i = 0; i < NumOutputs; i++) {
+//             zk_output_notes.reset(new output_note_gadget<FieldT>(
+//                 pb,
+//                 ZERO,
+//                 zk_phi->bits,
+//                 zk_h_sig->bits,
+//                 false,//i ? true : false,
+//                 zk_output_commitments
+//             ));
+//         // }
 //     }
 
-//     // Return the element being witnessed (should be a note
-//     // commitment!)
-//     Hash element() const {
-//         return tree.last();
+//     void generate_r1cs_constraints() {
+//         // The true passed here ensures all the inputs
+//         // are boolean constrained.
+//         unpacker->generate_r1cs_constraints(true);
+
+//         // Constrain `ZERO`
+//         generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
+
+//         // Constrain bitness of phi
+//         zk_phi->generate_r1cs_constraints();
+
+//         // for (size_t i = 0; i < NumInputs; i++) {
+//             // Constrain the JoinSplit input constraints.
+//             zk_input_notes->generate_r1cs_constraints();
+
+//             // Authenticate h_sig with a_sk
+//             zk_mac_authentication->generate_r1cs_constraints();
+//         // }
+
+//         // for (size_t i = 0; i < NumOutputs; i++) {
+//             // Constrain the JoinSplit output constraints.
+//             zk_output_notes->generate_r1cs_constraints();
+//         // }
+
+//         // Value balance
+//         {
+//             linear_combination<FieldT> left_side = packed_addition(zk_vpub_old);
+//             // for (size_t i = 0; i < NumInputs; i++) {
+//                 left_side = left_side + packed_addition(zk_input_notes->value);
+//             // }
+
+//             linear_combination<FieldT> right_side = packed_addition(zk_vpub_new);
+//             // for (size_t i = 0; i < NumOutputs; i++) {
+//                 right_side = right_side + packed_addition(zk_output_notes->value);
+//             // }
+
+//             // Ensure that both sides are equal
+//             this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
+//                 1,
+//                 left_side,
+//                 right_side
+//             ));
+
+//             // #854: Ensure that left_side is a 64-bit integer.
+//             for (size_t i = 0; i < 64; i++) {
+//                 generate_boolean_r1cs_constraint<FieldT>(
+//                     this->pb,
+//                     zk_total_uint64[i],
+//                     ""
+//                 );
+//             }
+
+//             this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
+//                 1,
+//                 left_side,
+//                 packed_addition(zk_total_uint64)
+//             ));
+//         }
 //     }
 
-//     Hash root() const {
-//         return tree.root(Depth, partial_path());
+//     void generate_r1cs_witness(
+//         const uint252& phi,
+//         const uint256& rt,
+//         const uint256& h_sig,
+//         const JSInput& inputs,
+//         const Note& outputs,
+//         uint64_t vpub_old,
+//         uint64_t vpub_new
+//     ) {
+//         // Witness `zero`
+//         this->pb.val(ZERO) = FieldT::zero();
+
+//         // Witness rt. This is not a sanity check.
+//         //
+//         // This ensures the read gadget constrains
+//         // the intended root in the event that
+//         // both inputs are zero-valued.
+//         zk_merkle_root->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(rt)
+//         );
+
+//         // Witness public balance values
+//         zk_vpub_old.fill_with_bits(
+//             this->pb,
+//             uint64_to_bool_vector(vpub_old)
+//         );
+//         zk_vpub_new.fill_with_bits(
+//             this->pb,
+//             uint64_to_bool_vector(vpub_new)
+//         );
+
+//         {
+//             // Witness total_uint64 bits
+//             uint64_t left_side_acc = vpub_old;
+//             // for (size_t i = 0; i < NumInputs; i++) {
+//                 left_side_acc += inputs.note.value;
+//             // }
+
+//             zk_total_uint64.fill_with_bits(
+//                 this->pb,
+//                 uint64_to_bool_vector(left_side_acc)
+//             );
+//         }
+
+//         // Witness phi
+//         zk_phi->bits.fill_with_bits(
+//             this->pb,
+//             uint252_to_bool_vector(phi)
+//         );
+
+//         // Witness h_sig
+//         zk_h_sig->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(h_sig)
+//         );
+
+//         // for (size_t i = 0; i < NumInputs; i++) {
+//             // Witness the input information.
+//             auto merkle_path = inputs.witness.path();
+//             zk_input_notes->generate_r1cs_witness(
+//                 merkle_path,
+//                 inputs.key,
+//                 inputs.note
+//             );
+
+//             // Witness macs
+//             zk_mac_authentication->generate_r1cs_witness();
+//         // }
+
+//         // for (size_t i = 0; i < NumOutputs; i++) {
+//             // Witness the output information.
+//             zk_output_notes->generate_r1cs_witness(outputs);
+//         // }
+
+//         // [SANITY CHECK] Ensure that the intended root
+//         // was witnessed by the inputs, even if the read
+//         // gadget overwrote it. This allows the prover to
+//         // fail instead of the verifier, in the event that
+//         // the roots of the inputs do not match the
+//         // treestate provided to the proving API.
+//         zk_merkle_root->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(rt)
+//         );
+
+//         // This happens last, because only by now are all the
+//         // verifier inputs resolved.
+//         unpacker->generate_r1cs_witness_from_bits();
 //     }
 
-//     void append(Hash obj);
+//     static r1cs_primary_input<FieldT> witness_map(
+//         const uint256& rt,
+//         const uint256& h_sig,
+//         const uint256& macs,
+//         const uint256& nullifiers,
+//         const uint256& commitments,
+//         uint64_t vpub_old,
+//         uint64_t vpub_new
+//     ) {
+//         std::vector<bool> verify_inputs;
 
-//     ADD_SERIALIZE_METHODS;
-
-//     template <typename Stream, typename Operation>
-//     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-//         READWRITE(tree);
-//         READWRITE(filled);
-//         READWRITE(cursor);
-
-//         cursor_depth = tree.next_depth(filled.size());
-//     }
-
-//     template <size_t D, typename H>
-//     friend bool operator==(const GuneroMerkleTreeWitness<D, H>& a,
-//                            const GuneroMerkleTreeWitness<D, H>& b);
-
-// private:
-//     GuneroMerkleTree<Depth, Hash> tree;
-//     std::vector<Hash> filled;
-//     boost::optional<GuneroMerkleTree<Depth, Hash>> cursor;
-//     size_t cursor_depth = 0;
-//     std::deque<Hash> partial_path() const;
-//     GuneroMerkleTreeWitness(GuneroMerkleTree<Depth, Hash> tree) : tree(tree) {}
-// };
-
-// typedef GuneroMerkleTreeWitness<INCREMENTAL_MERKLE_TREE_DEPTH, sha256_two_to_one_hash_gadget<FieldT>> ZCIncrementalWitness;
-
-class JSInput {
-public:
-    ZCIncrementalWitness witness;
-    Note note;
-    SpendingKey key;
-
-    JSInput();
-    JSInput(ZCIncrementalWitness witness,
-            Note note,
-            SpendingKey key) : witness(witness), note(note), key(key) { }
-
-    uint256 nullifier() const {
-        return note.nullifier(key);
-    }
-};
-
-template<typename FieldT, typename HashT, size_t tree_depth>
-class gunerotransfer_gadget : gadget<FieldT> {
-private:
-    // Verifier inputs
-    pb_variable_array<FieldT> zk_packed_inputs;
-    pb_variable_array<FieldT> zk_unpacked_inputs;
-    std::shared_ptr<multipacking_gadget<FieldT>> unpacker;
-
-    std::shared_ptr<digest_variable<FieldT>> zk_merkle_root;
-    std::shared_ptr<digest_variable<FieldT>> zk_h_sig;
-    std::shared_ptr<digest_variable<FieldT>> zk_input_nullifiers;
-    std::shared_ptr<digest_variable<FieldT>> zk_input_macs;
-    std::shared_ptr<digest_variable<FieldT>> zk_output_commitments;
-    pb_variable_array<FieldT> zk_vpub_old;
-    pb_variable_array<FieldT> zk_vpub_new;
-
-    // Aux inputs
-    pb_variable<FieldT> ZERO;
-    std::shared_ptr<digest_variable<FieldT>> zk_phi;
-    pb_variable_array<FieldT> zk_total_uint64;
-
-    // Input note gadgets
-    std::shared_ptr<input_note_gadget<FieldT, HashT, tree_depth>> zk_input_notes;
-    std::shared_ptr<PRF_pk_gadget<FieldT>> zk_mac_authentication;
-
-    // Output note gadgets
-    std::shared_ptr<output_note_gadget<FieldT>> zk_output_notes;
-
-public:
-    gunerotransfer_gadget(protoboard<FieldT> &pb) : gadget<FieldT>(pb) {
-        // Verification
-        {
-            // The verification inputs are all bit-strings of various
-            // lengths (256-bit digests and 64-bit integers) and so we
-            // pack them into as few field elements as possible. (The
-            // more verification inputs you have, the more expensive
-            // verification is.)
-            zk_packed_inputs.allocate(pb, verifying_field_element_size());
-            pb.set_input_sizes(verifying_field_element_size());
-
-            alloc_uint256(zk_unpacked_inputs, zk_merkle_root);
-            alloc_uint256(zk_unpacked_inputs, zk_h_sig);
-
-            // for (size_t i = 0; i < NumInputs; i++) {
-                alloc_uint256(zk_unpacked_inputs, zk_input_nullifiers);
-                alloc_uint256(zk_unpacked_inputs, zk_input_macs);
-            // }
-
-            // for (size_t i = 0; i < NumOutputs; i++) {
-                alloc_uint256(zk_unpacked_inputs, zk_output_commitments);
-            // }
-
-            alloc_uint64(zk_unpacked_inputs, zk_vpub_old);
-            alloc_uint64(zk_unpacked_inputs, zk_vpub_new);
-
-            assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
-
-            // This gadget will ensure that all of the inputs we provide are
-            // boolean constrained.
-            unpacker.reset(new multipacking_gadget<FieldT>(
-                pb,
-                zk_unpacked_inputs,
-                zk_packed_inputs,
-                FieldT::capacity(),
-                "unpacker"
-            ));
-        }
-
-        // We need a constant "zero" variable in some contexts. In theory
-        // it should never be necessary, but libsnark does not synthesize
-        // optimal circuits.
-        // 
-        // The first variable of our constraint system is constrained
-        // to be one automatically for us, and is known as `ONE`.
-        ZERO.allocate(pb);
-
-        zk_phi.reset(new digest_variable<FieldT>(pb, 252, ""));
-
-        zk_total_uint64.allocate(pb, 64);
-
-        // for (size_t i = 0; i < NumInputs; i++) {
-            // Input note gadget for commitments, macs, nullifiers,
-            // and spend authority.
-            zk_input_notes.reset(new input_note_gadget<FieldT, HashT,  tree_depth>(
-                pb,
-                ZERO,
-                zk_input_nullifiers,
-                *zk_merkle_root
-            ));
-
-            // The input keys authenticate h_sig to prevent
-            // malleability.
-            zk_mac_authentication.reset(new PRF_pk_gadget<FieldT>(
-                pb,
-                ZERO,
-                zk_input_notes->a_sk->bits,
-                zk_h_sig->bits,
-                false,//i ? true : false,
-                zk_input_macs
-            ));
-        // }
-
-        // for (size_t i = 0; i < NumOutputs; i++) {
-            zk_output_notes.reset(new output_note_gadget<FieldT>(
-                pb,
-                ZERO,
-                zk_phi->bits,
-                zk_h_sig->bits,
-                false,//i ? true : false,
-                zk_output_commitments
-            ));
-        // }
-    }
-
-    void generate_r1cs_constraints() {
-        // The true passed here ensures all the inputs
-        // are boolean constrained.
-        unpacker->generate_r1cs_constraints(true);
-
-        // Constrain `ZERO`
-        generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
-
-        // Constrain bitness of phi
-        zk_phi->generate_r1cs_constraints();
-
-        // for (size_t i = 0; i < NumInputs; i++) {
-            // Constrain the JoinSplit input constraints.
-            zk_input_notes->generate_r1cs_constraints();
-
-            // Authenticate h_sig with a_sk
-            zk_mac_authentication->generate_r1cs_constraints();
-        // }
-
-        // for (size_t i = 0; i < NumOutputs; i++) {
-            // Constrain the JoinSplit output constraints.
-            zk_output_notes->generate_r1cs_constraints();
-        // }
-
-        // Value balance
-        {
-            linear_combination<FieldT> left_side = packed_addition(zk_vpub_old);
-            // for (size_t i = 0; i < NumInputs; i++) {
-                left_side = left_side + packed_addition(zk_input_notes->value);
-            // }
-
-            linear_combination<FieldT> right_side = packed_addition(zk_vpub_new);
-            // for (size_t i = 0; i < NumOutputs; i++) {
-                right_side = right_side + packed_addition(zk_output_notes->value);
-            // }
-
-            // Ensure that both sides are equal
-            this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
-                1,
-                left_side,
-                right_side
-            ));
-
-            // #854: Ensure that left_side is a 64-bit integer.
-            for (size_t i = 0; i < 64; i++) {
-                generate_boolean_r1cs_constraint<FieldT>(
-                    this->pb,
-                    zk_total_uint64[i],
-                    ""
-                );
-            }
-
-            this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
-                1,
-                left_side,
-                packed_addition(zk_total_uint64)
-            ));
-        }
-    }
-
-    void generate_r1cs_witness(
-        const uint252& phi,
-        const uint256& rt,
-        const uint256& h_sig,
-        const JSInput& inputs,
-        const Note& outputs,
-        uint64_t vpub_old,
-        uint64_t vpub_new
-    ) {
-        // Witness `zero`
-        this->pb.val(ZERO) = FieldT::zero();
-
-        // Witness rt. This is not a sanity check.
-        //
-        // This ensures the read gadget constrains
-        // the intended root in the event that
-        // both inputs are zero-valued.
-        zk_merkle_root->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(rt)
-        );
-
-        // Witness public balance values
-        zk_vpub_old.fill_with_bits(
-            this->pb,
-            uint64_to_bool_vector(vpub_old)
-        );
-        zk_vpub_new.fill_with_bits(
-            this->pb,
-            uint64_to_bool_vector(vpub_new)
-        );
-
-        {
-            // Witness total_uint64 bits
-            uint64_t left_side_acc = vpub_old;
-            // for (size_t i = 0; i < NumInputs; i++) {
-                left_side_acc += inputs.note.value;
-            // }
-
-            zk_total_uint64.fill_with_bits(
-                this->pb,
-                uint64_to_bool_vector(left_side_acc)
-            );
-        }
-
-        // Witness phi
-        zk_phi->bits.fill_with_bits(
-            this->pb,
-            uint252_to_bool_vector(phi)
-        );
-
-        // Witness h_sig
-        zk_h_sig->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(h_sig)
-        );
-
-        // for (size_t i = 0; i < NumInputs; i++) {
-            // Witness the input information.
-            auto merkle_path = inputs.witness.path();
-            zk_input_notes->generate_r1cs_witness(
-                merkle_path,
-                inputs.key,
-                inputs.note
-            );
-
-            // Witness macs
-            zk_mac_authentication->generate_r1cs_witness();
-        // }
-
-        // for (size_t i = 0; i < NumOutputs; i++) {
-            // Witness the output information.
-            zk_output_notes->generate_r1cs_witness(outputs);
-        // }
-
-        // [SANITY CHECK] Ensure that the intended root
-        // was witnessed by the inputs, even if the read
-        // gadget overwrote it. This allows the prover to
-        // fail instead of the verifier, in the event that
-        // the roots of the inputs do not match the
-        // treestate provided to the proving API.
-        zk_merkle_root->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(rt)
-        );
-
-        // This happens last, because only by now are all the
-        // verifier inputs resolved.
-        unpacker->generate_r1cs_witness_from_bits();
-    }
-
-    static r1cs_primary_input<FieldT> witness_map(
-        const uint256& rt,
-        const uint256& h_sig,
-        const uint256& macs,
-        const uint256& nullifiers,
-        const uint256& commitments,
-        uint64_t vpub_old,
-        uint64_t vpub_new
-    ) {
-        std::vector<bool> verify_inputs;
-
-        insert_uint256(verify_inputs, rt);
-        insert_uint256(verify_inputs, h_sig);
+//         insert_uint256(verify_inputs, rt);
+//         insert_uint256(verify_inputs, h_sig);
         
-        // for (size_t i = 0; i < NumInputs; i++) {
-            insert_uint256(verify_inputs, nullifiers);
-            insert_uint256(verify_inputs, macs);
-        // }
+//         // for (size_t i = 0; i < NumInputs; i++) {
+//             insert_uint256(verify_inputs, nullifiers);
+//             insert_uint256(verify_inputs, macs);
+//         // }
 
-        // for (size_t i = 0; i < NumOutputs; i++) {
-            insert_uint256(verify_inputs, commitments);
-        // }
+//         // for (size_t i = 0; i < NumOutputs; i++) {
+//             insert_uint256(verify_inputs, commitments);
+//         // }
 
-        insert_uint64(verify_inputs, vpub_old);
-        insert_uint64(verify_inputs, vpub_new);
+//         insert_uint64(verify_inputs, vpub_old);
+//         insert_uint64(verify_inputs, vpub_new);
 
-        assert(verify_inputs.size() == verifying_input_bit_size());
-        auto verify_field_elements = libff::pack_bit_vector_into_field_element_vector<FieldT>(verify_inputs);
-        assert(verify_field_elements.size() == verifying_field_element_size());
-        return verify_field_elements;
-    }
+//         assert(verify_inputs.size() == verifying_input_bit_size());
+//         auto verify_field_elements = libff::pack_bit_vector_into_field_element_vector<FieldT>(verify_inputs);
+//         assert(verify_field_elements.size() == verifying_field_element_size());
+//         return verify_field_elements;
+//     }
 
-    static size_t verifying_input_bit_size() {
-        size_t acc = 0;
+//     static size_t verifying_input_bit_size() {
+//         size_t acc = 0;
 
-        acc += 256; // the merkle root (anchor)
-        acc += 256; // h_sig
-        // for (size_t i = 0; i < NumInputs; i++) {
-            acc += 256; // nullifier
-            acc += 256; // mac
-        // }
-        // for (size_t i = 0; i < NumOutputs; i++) {
-            acc += 256; // new commitment
-        // }
-        acc += 64; // vpub_old
-        acc += 64; // vpub_new
+//         acc += 256; // the merkle root (anchor)
+//         acc += 256; // h_sig
+//         // for (size_t i = 0; i < NumInputs; i++) {
+//             acc += 256; // nullifier
+//             acc += 256; // mac
+//         // }
+//         // for (size_t i = 0; i < NumOutputs; i++) {
+//             acc += 256; // new commitment
+//         // }
+//         acc += 64; // vpub_old
+//         acc += 64; // vpub_new
 
-        return acc;
-    }
+//         return acc;
+//     }
 
-    static size_t verifying_field_element_size() {
-        return div_ceil(verifying_input_bit_size(), FieldT::capacity());
-    }
+//     static size_t verifying_field_element_size() {
+//         return div_ceil(verifying_input_bit_size(), FieldT::capacity());
+//     }
 
-    void alloc_uint256(
-        pb_variable_array<FieldT>& packed_into,
-        std::shared_ptr<digest_variable<FieldT>>& var
-    ) {
-        var.reset(new digest_variable<FieldT>(this->pb, 256, ""));
-        packed_into.insert(packed_into.end(), var->bits.begin(), var->bits.end());
-    }
+//     void alloc_uint256(
+//         pb_variable_array<FieldT>& packed_into,
+//         std::shared_ptr<digest_variable<FieldT>>& var
+//     ) {
+//         var.reset(new digest_variable<FieldT>(this->pb, 256, ""));
+//         packed_into.insert(packed_into.end(), var->bits.begin(), var->bits.end());
+//     }
 
-    void alloc_uint64(
-        pb_variable_array<FieldT>& packed_into,
-        pb_variable_array<FieldT>& integer
-    ) {
-        integer.allocate(this->pb, 64, "");
-        packed_into.insert(packed_into.end(), integer.begin(), integer.end());
-    }
-};
+//     void alloc_uint64(
+//         pb_variable_array<FieldT>& packed_into,
+//         pb_variable_array<FieldT>& integer
+//     ) {
+//         integer.allocate(this->pb, 64, "");
+//         packed_into.insert(packed_into.end(), integer.begin(), integer.end());
+//     }
+// };
 
 std::string strprintf(const char *fromat, ...)
 {
@@ -2206,18 +2248,20 @@ public:
         gunero.generate_r1cs_constraints(r1csPath, pkPath, vkPath);
     }
 
-    void makeTestVariables(
+    static void makeTestVariables(
         GuneroMerklePath& p_path,
         libff::bit_vector& leaf,
-        libff::bit_vector& root
+        libff::bit_vector& root,
+        size_t tree_depth_static,
+        size_t digest_len_static
     )
     {
         /* prepare test variables */
         libff::print_header("Gunero prepare test variables");
-        std::vector<merkle_authentication_node> path(tree_depth);
-        // path = std::vector<merkle_authentication_node>(tree_depth);
+        std::vector<merkle_authentication_node> path(tree_depth_static);
+        // path = std::vector<merkle_authentication_node>(tree_depth_static);
 
-        libff::bit_vector prev_hash(digest_len);
+        libff::bit_vector prev_hash(digest_len_static);
         std::generate(prev_hash.begin(), prev_hash.end(), [&]() { return std::rand() % 2; });
         // libff::bit_vector leaf = prev_hash;
         leaf = prev_hash;
@@ -2226,12 +2270,12 @@ public:
 
         size_t address = 0;
         // address = 0;
-        for (long level = tree_depth-1; level >= 0; --level)
+        for (long level = tree_depth_static-1; level >= 0; --level)
         {
             const bool computed_is_right = (std::rand() % 2);
-            address |= (computed_is_right ? 1ul << (tree_depth-1-level) : 0);
+            address |= (computed_is_right ? 1ul << (tree_depth_static-1-level) : 0);
             address_bits.push_back(computed_is_right);
-            libff::bit_vector other(digest_len);
+            libff::bit_vector other(digest_len_static);
             std::generate(other.begin(), other.end(), [&]() { return std::rand() % 2; });
 
             libff::bit_vector block = prev_hash;
@@ -2251,116 +2295,99 @@ public:
 
     ZCProof prove(
         const libff::bit_vector& root,
-        // const size_t address,
-        // const libff::bit_vector& address_bits,
         const GuneroMerklePath& path,
         const libff::bit_vector& leaf,
-        // const std::vector<merkle_authentication_node>& path,
         const std::string& pkPath,
         const std::string& vkPath
-
-
-        
-        // Note& out_notes,
-        // ZCNoteEncryption::Ciphertext& out_ciphertexts,
-        // uint256& out_ephemeralKey,
-        // const uint256& pubKeyHash,
-        // uint256& out_randomSeed,
-        // uint256& out_macs,
-        // uint256& out_nullifiers,
-        // uint256& out_commitments,
-        // uint64_t vpub_old,
-        // uint64_t vpub_new,
-        // const uint256& rt
     ) {
         libff::print_header("Gunero witness (proof)");
 
-        libff::print_header("Gunero loadFromFile(pk)");
-        r1cs_ppzksnark_proving_key<BaseT> pk;
-        loadFromFile(pkPath, pk);
-        printf("\n"); libff::print_indent(); libff::print_mem("after Gunero loadFromFile(pk)"); libff::print_time("after Gunero loadFromFile(pk)");
-
-        protoboard<FieldT> pb;
+        ZCProof proof;
         {
-            libff::print_header("Gunero guneromembership_gadget.load_r1cs_constraints()");
+            libff::print_header("Gunero loadFromFile(pk)");
+            r1cs_ppzksnark_proving_key<BaseT> pk;
+            loadFromFile(pkPath, pk);
+            printf("\n"); libff::print_indent(); libff::print_mem("after Gunero loadFromFile(pk)"); libff::print_time("after Gunero loadFromFile(pk)");
 
-            guneromembership_gadget<FieldT, BaseT, HashT, tree_depth> g(pb);
-            g.load_r1cs_constraints();
-            g.generate_r1cs_witness(
-                root,
-                path,
-                leaf
-            );
+            protoboard<FieldT> pb;
+            {
+                libff::print_header("Gunero guneromembership_gadget.load_r1cs_constraints()");
 
-            printf("\n"); libff::print_indent(); libff::print_mem("after guneromembership_gadget.load_r1cs_constraints()"); libff::print_time("after guneromembership_gadget.load_r1cs_constraints()");
+                guneromembership_gadget<FieldT, BaseT, HashT, tree_depth> g(pb);
+                g.generate_r1cs_constraints(
+                    std::string(),
+                    std::string(),
+                    std::string());
+                g.generate_r1cs_witness(
+                    root,
+                    leaf,
+                    path
+                );
+
+                printf("\n"); libff::print_indent(); libff::print_mem("after guneromembership_gadget.load_r1cs_constraints()"); libff::print_time("after guneromembership_gadget.load_r1cs_constraints()");
+            }
+
+            // The constraint system must be satisfied or there is an unimplemented
+            // or incorrect sanity check above. Or the constraint system is broken!
+            assert(pb.is_satisfied());
+
+            // TODO: These are copies, which is not strictly necessary.
+            printf("num_inputs: %02x\n", pb.num_inputs());
+            r1cs_primary_input<FieldT> primary_input = pb.primary_input();
+            r1cs_auxiliary_input<FieldT> aux_input = pb.auxiliary_input();
+
+            // Swap A and B if it's beneficial (less arithmetic in G2)
+            // In our circuit, we already know that it's beneficial
+            // to swap, but it takes so little time to perform this
+            // estimate that it doesn't matter if we check every time.
+            // pb.constraint_system.swap_AB_if_beneficial();
+
+            proof = ZCProof(r1cs_ppzksnark_prover<BaseT>(
+                pk,
+                primary_input,
+                aux_input
+            ));
+
+            printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
         }
 
-        // The constraint system must be satisfied or there is an unimplemented
-        // or incorrect sanity check above. Or the constraint system is broken!
-        assert(pb.is_satisfied());
+        {
+            //Verify
+            r1cs_ppzksnark_verification_key<BaseT> vk;
+            loadFromFile(vkPath, vk);
 
-        // TODO: These are copies, which is not strictly necessary.
-        printf("num_inputs: %02x\n", pb.num_inputs());
-        r1cs_primary_input<FieldT> primary_input = pb.primary_input();
-        r1cs_auxiliary_input<FieldT> aux_input = pb.auxiliary_input();
+            r1cs_ppzksnark_processed_verification_key<BaseT> vk_precomp = r1cs_ppzksnark_verifier_process_vk(vk);
+            try {
+                r1cs_ppzksnark_proof<BaseT> r1cs_proof = proof.to_libsnark_proof<r1cs_ppzksnark_proof<BaseT>>();
 
-        // Swap A and B if it's beneficial (less arithmetic in G2)
-        // In our circuit, we already know that it's beneficial
-        // to swap, but it takes so little time to perform this
-        // estimate that it doesn't matter if we check every time.
-        // pb.constraint_system.swap_AB_if_beneficial();
+                // uint256 h_sig = this->h_sig(randomSeed, nullifiers, pubKeyHash);
 
-        printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
+                r1cs_primary_input<FieldT> witness = guneromembership_gadget<FieldT, BaseT, HashT, tree_depth>::witness_map(
+                    root
+                );
 
-        ZCProof proof = ZCProof(r1cs_ppzksnark_prover<BaseT>(
-            pk,
-            primary_input,
-            aux_input
-        ));
+                ProofVerifier verifierEnabled = ProofVerifier::Strict();
 
-        // return ZCProof(r1cs_ppzksnark_prover<BaseT>(
-        //     pk,
-        //     primary_input,
-        //     aux_input
-        //     // ,
-        //     // pb.constraint_system
-        // ));
+                bool verified = verifierEnabled.check(
+                    vk,
+                    vk_precomp,
+                    witness,
+                    r1cs_proof
+                );
 
-        //Verify
-        r1cs_ppzksnark_verification_key<BaseT> vk;
-        loadFromFile(vkPath, vk);
+                printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
 
-        r1cs_ppzksnark_processed_verification_key<BaseT> vk_precomp = r1cs_ppzksnark_verifier_process_vk(vk);
-        try {
-            r1cs_ppzksnark_proof<BaseT> r1cs_proof = proof.to_libsnark_proof<r1cs_ppzksnark_proof<BaseT>>();
-
-            // uint256 h_sig = this->h_sig(randomSeed, nullifiers, pubKeyHash);
-
-            r1cs_primary_input<FieldT> witness = guneromembership_gadget<FieldT, BaseT, HashT, tree_depth>::witness_map(
-                root
-            );
-
-            ProofVerifier verifierEnabled = ProofVerifier::Strict();
-
-            bool verified = verifierEnabled.check(
-                vk,
-                vk_precomp,
-                witness,
-                r1cs_proof
-            );
-
-            printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
-
-            if (verified)
-            {
-                return proof;
-            }
-            else
-            {
+                if (verified)
+                {
+                    return proof;
+                }
+                else
+                {
+                    return ZCProof();
+                }
+            } catch (...) {
                 return ZCProof();
-            }
-        } catch (...) {
-            return ZCProof();
+        }
         }
     }
 
@@ -2441,11 +2468,7 @@ int main () {
     libff::init_alt_bn128_params();
 #endif
 
-#define MERKLE_TREE_DEPTH 4
-
-    // Gunero_test_merkle_tree_check_read_gadget<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, MERKLE_TREE_DEPTH>();
-
-    GuneroMembershipCircuit<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, MERKLE_TREE_DEPTH> gmc;
+#define MERKLE_TREE_DEPTH 3
 
     std::string r1csPath = "/home/sean/Silencer/build/src/r1cs.bin";
     std::string pkPath = "/home/sean/Silencer/build/src/pk.bin";
@@ -2457,15 +2480,19 @@ int main () {
     std::string rootPath = "/home/sean/Silencer/build/src/p_root.bin";
     std::string proofPath = "/home/sean/Silencer/build/src/proof.bin";
 
-    /* generate circuit */
-    libff::print_header("Gunero Generator");
-
-    if (0)
+    //if (0)
     {
+        /* generate circuit */
+        libff::print_header("Gunero Generator");
+
+        GuneroMembershipCircuit<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, MERKLE_TREE_DEPTH> gmc;
+
         gmc.generate(r1csPath, pkPath, vkPath);
     }
-    else if (1)
+    //else if (1)
     {
+        GuneroMembershipCircuit<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, MERKLE_TREE_DEPTH> gmc;
+
         //Given secret key s [512b]
         //P = secp256k1multiply(G, s) [512b]
         //A = right(keccak256compress(P), 20) [160b]
@@ -2477,7 +2504,7 @@ int main () {
         libff::bit_vector root;
         GuneroMerklePath path;
 
-        gmc.makeTestVariables(path, leaf, root);
+        gmc.makeTestVariables(path, leaf, root, MERKLE_TREE_DEPTH, sha256_two_to_one_hash_gadget<FieldT>::get_digest_len());
 
         saveToFile(leafPath, leaf);
         saveToFile(pathPath, path);
@@ -2487,8 +2514,10 @@ int main () {
 
         saveToFile(proofPath, proof);
     }
-    else
+    //else
     {
+        GuneroMembershipCircuit<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, MERKLE_TREE_DEPTH> gmc;
+
         libff::bit_vector root;
         loadFromFile(rootPath, root);
 
