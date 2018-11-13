@@ -98,68 +98,68 @@ uint160 random_uint160();
 
 #define NOTEENCRYPTION_AUTH_BYTES 16
 
-template<size_t MLEN>
-class NoteEncryption {
-protected:
-    enum { CLEN=MLEN+NOTEENCRYPTION_AUTH_BYTES };
-    uint256 epk;
-    uint256 esk;
-    unsigned char nonce;
-    uint256 hSig;
+// template<size_t MLEN>
+// class NoteEncryption {
+// protected:
+//     enum { CLEN=MLEN+NOTEENCRYPTION_AUTH_BYTES };
+//     uint256 epk;
+//     uint256 esk;
+//     unsigned char nonce;
+//     uint256 hSig;
 
-public:
-    typedef boost::array<unsigned char, CLEN> Ciphertext;
-    typedef boost::array<unsigned char, MLEN> Plaintext;
+// public:
+//     typedef boost::array<unsigned char, CLEN> Ciphertext;
+//     typedef boost::array<unsigned char, MLEN> Plaintext;
 
-    NoteEncryption(uint256 hSig);
+//     NoteEncryption(uint256 hSig);
 
-    // Gets the ephemeral public key
-    uint256 get_epk() {
-        return epk;
-    }
+//     // Gets the ephemeral public key
+//     uint256 get_epk() {
+//         return epk;
+//     }
 
-    // Encrypts `message` with `pk_enc` and returns the ciphertext.
-    // This is only called ZC_NUM_JS_OUTPUTS times for a given instantiation; 
-    // but can be called 255 times before the nonce-space runs out.
-    Ciphertext encrypt(const uint256 &pk_enc,
-                       const Plaintext &message
-                      );
+//     // Encrypts `message` with `pk_enc` and returns the ciphertext.
+//     // This is only called ZC_NUM_JS_OUTPUTS times for a given instantiation; 
+//     // but can be called 255 times before the nonce-space runs out.
+//     Ciphertext encrypt(const uint256 &pk_enc,
+//                        const Plaintext &message
+//                       );
 
-    // Creates a NoteEncryption private key
-    static uint256 generate_privkey(const uint252 &a_sk);
+//     // Creates a NoteEncryption private key
+//     static uint256 generate_privkey(const uint252 &a_sk);
 
-    // Creates a NoteEncryption public key from a private key
-    static uint256 generate_pubkey(const uint256 &sk_enc);
-};
+//     // Creates a NoteEncryption public key from a private key
+//     static uint256 generate_pubkey(const uint256 &sk_enc);
+// };
 
-template<size_t MLEN>
-class NoteDecryption {
-protected:
-    enum { CLEN=MLEN+NOTEENCRYPTION_AUTH_BYTES };
-    uint256 sk_enc;
-    uint256 pk_enc;
+// template<size_t MLEN>
+// class NoteDecryption {
+// protected:
+//     enum { CLEN=MLEN+NOTEENCRYPTION_AUTH_BYTES };
+//     uint256 sk_enc;
+//     uint256 pk_enc;
 
-public:
-    typedef boost::array<unsigned char, CLEN> Ciphertext;
-    typedef boost::array<unsigned char, MLEN> Plaintext;
+// public:
+//     typedef boost::array<unsigned char, CLEN> Ciphertext;
+//     typedef boost::array<unsigned char, MLEN> Plaintext;
 
-    NoteDecryption() { }
-    NoteDecryption(uint256 sk_enc);
+//     NoteDecryption() { }
+//     NoteDecryption(uint256 sk_enc);
 
-    Plaintext decrypt(const Ciphertext &ciphertext,
-                      const uint256 &epk,
-                      const uint256 &hSig,
-                      unsigned char nonce
-                     ) const;
+//     Plaintext decrypt(const Ciphertext &ciphertext,
+//                       const uint256 &epk,
+//                       const uint256 &hSig,
+//                       unsigned char nonce
+//                      ) const;
 
-    friend inline bool operator==(const NoteDecryption& a, const NoteDecryption& b) {
-        return a.sk_enc == b.sk_enc && a.pk_enc == b.pk_enc;
-    }
-    friend inline bool operator<(const NoteDecryption& a, const NoteDecryption& b) {
-        return (a.sk_enc < b.sk_enc ||
-                (a.sk_enc == b.sk_enc && a.pk_enc < b.pk_enc));
-    }
-};
+//     friend inline bool operator==(const NoteDecryption& a, const NoteDecryption& b) {
+//         return a.sk_enc == b.sk_enc && a.pk_enc == b.pk_enc;
+//     }
+//     friend inline bool operator<(const NoteDecryption& a, const NoteDecryption& b) {
+//         return (a.sk_enc < b.sk_enc ||
+//                 (a.sk_enc == b.sk_enc && a.pk_enc < b.pk_enc));
+//     }
+// };
 
 #define ZC_NOTEPLAINTEXT_LEADING 1
 #define ZC_V_SIZE 8
@@ -421,21 +421,6 @@ public:
 
         verify_inputs.insert(verify_inputs.end(), root.begin(), root.end());
         
-        // insert_uint256(verify_inputs, rt);
-        // insert_uint256(verify_inputs, h_sig);
-        
-        // // for (size_t i = 0; i < NumInputs; i++) {
-        //     insert_uint256(verify_inputs, nullifiers);
-        //     insert_uint256(verify_inputs, macs);
-        // // }
-
-        // // for (size_t i = 0; i < NumOutputs; i++) {
-        //     insert_uint256(verify_inputs, commitments);
-        // // }
-
-        // insert_uint64(verify_inputs, vpub_old);
-        // insert_uint64(verify_inputs, vpub_new);
-
         assert(verify_inputs.size() == verifying_input_bit_size());
         auto verify_field_elements = libff::pack_bit_vector_into_field_element_vector<FieldT>(verify_inputs);
         assert(verify_field_elements.size() == verifying_field_element_size());
@@ -469,6 +454,7 @@ public:
             leaf
         );
 
+        // Witness merkle tree authentication path
         witness_input->generate_r1cs_witness(path);
 
         // [SANITY CHECK] Ensure that the intended root
@@ -584,461 +570,461 @@ public:
 //     uint256 nullifier(const SpendingKey& a_sk) const;
 // };
 
-template<typename FieldT>
-class note_gadget : public gadget<FieldT> {
-public:
-    pb_variable_array<FieldT> value;
-    std::shared_ptr<digest_variable<FieldT>> r;
-
-    note_gadget(protoboard<FieldT> &pb) : gadget<FieldT>(pb) {
-        value.allocate(pb, 64);
-        r.reset(new digest_variable<FieldT>(pb, 256, ""));
-    }
-
-    void generate_r1cs_constraints() {
-        for (size_t i = 0; i < 64; i++) {
-            generate_boolean_r1cs_constraint<FieldT>(
-                this->pb,
-                value[i],
-                "boolean_value"
-            );
-        }
-
-        r->generate_r1cs_constraints();
-    }
-
-    void generate_r1cs_witness(const Note& note) {
-        r->bits.fill_with_bits(this->pb, uint256_to_bool_vector(note.r));
-        value.fill_with_bits(this->pb, uint64_to_bool_vector(note.value));
-    }
-};
-
-template<typename FieldT>
-class note_commitment_gadget : gadget<FieldT> {
-private:
-    std::shared_ptr<block_variable<FieldT>> block1;
-    std::shared_ptr<block_variable<FieldT>> block2;
-    std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher1;
-    std::shared_ptr<digest_variable<FieldT>> intermediate_hash;
-    std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher2;
-
-public:
-    note_commitment_gadget(
-        protoboard<FieldT> &pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& a_pk,
-        pb_variable_array<FieldT>& v,
-        pb_variable_array<FieldT>& rho,
-        pb_variable_array<FieldT>& r,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : gadget<FieldT>(pb) {
-        pb_variable_array<FieldT> leading_byte =
-            from_bits({1, 0, 1, 1, 0, 0, 0, 0}, ZERO);
-
-        pb_variable_array<FieldT> first_of_rho(rho.begin(), rho.begin()+184);
-        pb_variable_array<FieldT> last_of_rho(rho.begin()+184, rho.end());
-
-        intermediate_hash.reset(new digest_variable<FieldT>(pb, 256, ""));
-
-        // final padding
-        pb_variable_array<FieldT> length_padding =
-            from_bits({
-                // padding
-                1,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-
-                // length of message (840 bits)
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,0,0,
-                0,0,0,0,0,0,1,1,
-                0,1,0,0,1,0,0,0
-            }, ZERO);
-
-        block1.reset(new block_variable<FieldT>(pb, {
-            leading_byte,
-            a_pk,
-            v,
-            first_of_rho
-        }, ""));
-
-        block2.reset(new block_variable<FieldT>(pb, {
-            last_of_rho,
-            r,
-            length_padding
-        }, ""));
-
-        pb_linear_combination_array<FieldT> IV = SHA256_default_IV(pb);
-
-        hasher1.reset(new sha256_compression_function_gadget<FieldT>(
-            pb,
-            IV,
-            block1->bits,
-            *intermediate_hash,
-        ""));
-
-        pb_linear_combination_array<FieldT> IV2(intermediate_hash->bits);
-
-        hasher2.reset(new sha256_compression_function_gadget<FieldT>(
-            pb,
-            IV2,
-            block2->bits,
-            *result,
-        ""));
-    }
-
-    void generate_r1cs_constraints() {
-        hasher1->generate_r1cs_constraints();
-        hasher2->generate_r1cs_constraints();
-    }
-
-    void generate_r1cs_witness() {
-        hasher1->generate_r1cs_witness();
-        hasher2->generate_r1cs_witness();
-    }
-};
-
-template<typename FieldT>
-class PRF_gadget : gadget<FieldT> {
-private:
-    std::shared_ptr<block_variable<FieldT>> block;
-    std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher;
-    std::shared_ptr<digest_variable<FieldT>> result;
-
-public:
-    PRF_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        bool a,
-        bool b,
-        bool c,
-        bool d,
-        pb_variable_array<FieldT> x,
-        pb_variable_array<FieldT> y,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : gadget<FieldT>(pb), result(result) {
-
-        pb_linear_combination_array<FieldT> IV = SHA256_default_IV(pb);
-
-        pb_variable_array<FieldT> discriminants;
-        discriminants.emplace_back(a ? ONE : ZERO);
-        discriminants.emplace_back(b ? ONE : ZERO);
-        discriminants.emplace_back(c ? ONE : ZERO);
-        discriminants.emplace_back(d ? ONE : ZERO);
-
-        block.reset(new block_variable<FieldT>(pb, {
-            discriminants,
-            x,
-            y
-        }, "PRF_block"));
-
-        hasher.reset(new sha256_compression_function_gadget<FieldT>(
-            pb,
-            IV,
-            block->bits,
-            *result,
-        "PRF_hasher"));
-    }
-
-    void generate_r1cs_constraints() {
-        hasher->generate_r1cs_constraints();
-    }
-
-    void generate_r1cs_witness() {
-        hasher->generate_r1cs_witness();
-    }
-};
-
-template<typename FieldT>
-pb_variable_array<FieldT> gen256zeroes(pb_variable<FieldT>& ZERO) {
-    pb_variable_array<FieldT> ret;
-    while (ret.size() < 256) {
-        ret.emplace_back(ZERO);
-    }
-
-    return ret;
-}
-
-template<typename FieldT>
-class PRF_addr_a_pk_gadget : public PRF_gadget<FieldT> {
-public:
-    PRF_addr_a_pk_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& a_sk,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : PRF_gadget<FieldT>(pb, ZERO, 1, 1, 0, 0, a_sk, gen256zeroes(ZERO), result) {}
-};
-
-template<typename FieldT>
-class PRF_nf_gadget : public PRF_gadget<FieldT> {
-public:
-    PRF_nf_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& a_sk,
-        pb_variable_array<FieldT>& rho,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : PRF_gadget<FieldT>(pb, ZERO, 1, 1, 1, 0, a_sk, rho, result) {}
-};
-
-template<typename FieldT>
-class PRF_pk_gadget : public PRF_gadget<FieldT> {
-public:
-    PRF_pk_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& a_sk,
-        pb_variable_array<FieldT>& h_sig,
-        bool nonce,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : PRF_gadget<FieldT>(pb, ZERO, 0, nonce, 0, 0, a_sk, h_sig, result) {}
-};
-
-template<typename FieldT>
-class PRF_rho_gadget : public PRF_gadget<FieldT> {
-public:
-    PRF_rho_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& phi,
-        pb_variable_array<FieldT>& h_sig,
-        bool nonce,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : PRF_gadget<FieldT>(pb, ZERO, 0, nonce, 1, 0, phi, h_sig, result) {}
-};
-
-template<typename FieldT, typename HashT, size_t tree_depth>
-class input_note_gadget : public note_gadget<FieldT> {
-private:
-    std::shared_ptr<digest_variable<FieldT>> a_pk;
-    std::shared_ptr<digest_variable<FieldT>> rho;
-
-    std::shared_ptr<digest_variable<FieldT>> commitment;
-    std::shared_ptr<note_commitment_gadget<FieldT>> commit_to_inputs;
-
-    pb_variable<FieldT> value_enforce;
-    std::shared_ptr<gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>> witness_input;
-
-    std::shared_ptr<PRF_addr_a_pk_gadget<FieldT>> spend_authority;
-    std::shared_ptr<PRF_nf_gadget<FieldT>> expose_nullifiers;
-public:
-    std::shared_ptr<digest_variable<FieldT>> a_sk;
-
-    input_note_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        std::shared_ptr<digest_variable<FieldT>> nullifier,
-        digest_variable<FieldT> rt
-    ) : note_gadget<FieldT>(pb) {
-        a_sk.reset(new digest_variable<FieldT>(pb, 252, ""));
-        a_pk.reset(new digest_variable<FieldT>(pb, 256, ""));
-        rho.reset(new digest_variable<FieldT>(pb, 256, ""));
-        commitment.reset(new digest_variable<FieldT>(pb, 256, ""));
-
-        spend_authority.reset(new PRF_addr_a_pk_gadget<FieldT>(
-            pb,
-            ZERO,
-            a_sk->bits,
-            a_pk
-        ));
-
-        expose_nullifiers.reset(new PRF_nf_gadget<FieldT>(
-            pb,
-            ZERO,
-            a_sk->bits,
-            rho->bits,
-            nullifier
-        ));
-
-        commit_to_inputs.reset(new note_commitment_gadget<FieldT>(
-            pb,
-            ZERO,
-            a_pk->bits,
-            this->value,
-            rho->bits,
-            this->r->bits,
-            commitment
-        ));
-
-        value_enforce.allocate(pb);
-
-        witness_input.reset(new gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>(
-            pb,
-            *commitment,
-            rt,
-            value_enforce
-        ));
-    }
-
-    void generate_r1cs_constraints() {
-        note_gadget<FieldT>::generate_r1cs_constraints();
-
-        a_sk->generate_r1cs_constraints();
-        rho->generate_r1cs_constraints();
-
-        spend_authority->generate_r1cs_constraints();
-        expose_nullifiers->generate_r1cs_constraints();
-
-        commit_to_inputs->generate_r1cs_constraints();
-
-        // value * (1 - enforce) = 0
-        // Given `enforce` is boolean constrained:
-        // If `value` is zero, `enforce` _can_ be zero.
-        // If `value` is nonzero, `enforce` _must_ be one.
-        generate_boolean_r1cs_constraint<FieldT>(this->pb, value_enforce,"");
-
-        this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
-            packed_addition(this->value),
-            (1 - value_enforce),
-            0
-        ), "");
-
-        witness_input->generate_r1cs_constraints();
-    }
-
-    void generate_r1cs_witness(
-        const GuneroMerklePath& path,
-        const SpendingKey& key,
-        const Note& note
-    ) {
-        note_gadget<FieldT>::generate_r1cs_witness(note);
-
-        // Witness a_sk for the input
-        a_sk->bits.fill_with_bits(
-            this->pb,
-            uint252_to_bool_vector(key)
-        );
-
-        // Witness a_pk for a_sk with PRF_addr
-        spend_authority->generate_r1cs_witness();
-
-        // [SANITY CHECK] Witness a_pk with note information
-        a_pk->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(note.a_pk)
-        );
-
-        // Witness rho for the input note
-        rho->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(note.rho)
-        );
-
-        // Witness the nullifier for the input note
-        expose_nullifiers->generate_r1cs_witness();
-
-        // Witness the commitment of the input note
-        commit_to_inputs->generate_r1cs_witness();
-
-        // [SANITY CHECK] Ensure the commitment is
-        // valid.
-        commitment->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(note.cm())
-        );
-
-        // Set enforce flag for nonzero input value
-        this->pb.val(value_enforce) = (note.value != 0) ? FieldT::one() : FieldT::zero();
-
-        // Witness merkle tree authentication path
-        witness_input->generate_r1cs_witness(path);
-    }
-};
-
-template<typename FieldT>
-class output_note_gadget : public note_gadget<FieldT> {
-private:
-    std::shared_ptr<digest_variable<FieldT>> rho;
-    std::shared_ptr<digest_variable<FieldT>> a_pk;
-
-    std::shared_ptr<PRF_rho_gadget<FieldT>> prevent_faerie_gold;
-    std::shared_ptr<note_commitment_gadget<FieldT>> commit_to_outputs;
-
-public:
-    output_note_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& phi,
-        pb_variable_array<FieldT>& h_sig,
-        bool nonce,
-        std::shared_ptr<digest_variable<FieldT>> commitment
-    ) : note_gadget<FieldT>(pb) {
-        rho.reset(new digest_variable<FieldT>(pb, 256, ""));
-        a_pk.reset(new digest_variable<FieldT>(pb, 256, ""));
-
-        // Do not allow the caller to choose the same "rho"
-        // for any two valid notes in a given view of the
-        // blockchain. See protocol specification for more
-        // details.
-        prevent_faerie_gold.reset(new PRF_rho_gadget<FieldT>(
-            pb,
-            ZERO,
-            phi,
-            h_sig,
-            nonce,
-            rho
-        ));
-
-        // Commit to the output notes publicly without
-        // disclosing them.
-        commit_to_outputs.reset(new note_commitment_gadget<FieldT>(
-            pb,
-            ZERO,
-            a_pk->bits,
-            this->value,
-            rho->bits,
-            this->r->bits,
-            commitment
-        ));
-    }
-
-    void generate_r1cs_constraints() {
-        note_gadget<FieldT>::generate_r1cs_constraints();
-
-        a_pk->generate_r1cs_constraints();
-
-        prevent_faerie_gold->generate_r1cs_constraints();
-
-        commit_to_outputs->generate_r1cs_constraints();
-    }
-
-    void generate_r1cs_witness(const Note& note) {
-        note_gadget<FieldT>::generate_r1cs_witness(note);
-
-        prevent_faerie_gold->generate_r1cs_witness();
-
-        // [SANITY CHECK] Witness rho ourselves with the
-        // note information.
-        rho->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(note.rho)
-        );
-
-        a_pk->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(note.a_pk)
-        );
-
-        commit_to_outputs->generate_r1cs_witness();
-    }
-};
+// template<typename FieldT>
+// class note_gadget : public gadget<FieldT> {
+// public:
+//     pb_variable_array<FieldT> value;
+//     std::shared_ptr<digest_variable<FieldT>> r;
+
+//     note_gadget(protoboard<FieldT> &pb) : gadget<FieldT>(pb) {
+//         value.allocate(pb, 64);
+//         r.reset(new digest_variable<FieldT>(pb, 256, ""));
+//     }
+
+//     void generate_r1cs_constraints() {
+//         for (size_t i = 0; i < 64; i++) {
+//             generate_boolean_r1cs_constraint<FieldT>(
+//                 this->pb,
+//                 value[i],
+//                 "boolean_value"
+//             );
+//         }
+
+//         r->generate_r1cs_constraints();
+//     }
+
+//     void generate_r1cs_witness(const Note& note) {
+//         r->bits.fill_with_bits(this->pb, uint256_to_bool_vector(note.r));
+//         value.fill_with_bits(this->pb, uint64_to_bool_vector(note.value));
+//     }
+// };
+
+// template<typename FieldT>
+// class note_commitment_gadget : gadget<FieldT> {
+// private:
+//     std::shared_ptr<block_variable<FieldT>> block1;
+//     std::shared_ptr<block_variable<FieldT>> block2;
+//     std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher1;
+//     std::shared_ptr<digest_variable<FieldT>> intermediate_hash;
+//     std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher2;
+
+// public:
+//     note_commitment_gadget(
+//         protoboard<FieldT> &pb,
+//         pb_variable<FieldT>& ZERO,
+//         pb_variable_array<FieldT>& a_pk,
+//         pb_variable_array<FieldT>& v,
+//         pb_variable_array<FieldT>& rho,
+//         pb_variable_array<FieldT>& r,
+//         std::shared_ptr<digest_variable<FieldT>> result
+//     ) : gadget<FieldT>(pb) {
+//         pb_variable_array<FieldT> leading_byte =
+//             from_bits({1, 0, 1, 1, 0, 0, 0, 0}, ZERO);
+
+//         pb_variable_array<FieldT> first_of_rho(rho.begin(), rho.begin()+184);
+//         pb_variable_array<FieldT> last_of_rho(rho.begin()+184, rho.end());
+
+//         intermediate_hash.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+//         // final padding
+//         pb_variable_array<FieldT> length_padding =
+//             from_bits({
+//                 // padding
+//                 1,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+
+//                 // length of message (840 bits)
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,0,0,
+//                 0,0,0,0,0,0,1,1,
+//                 0,1,0,0,1,0,0,0
+//             }, ZERO);
+
+//         block1.reset(new block_variable<FieldT>(pb, {
+//             leading_byte,
+//             a_pk,
+//             v,
+//             first_of_rho
+//         }, ""));
+
+//         block2.reset(new block_variable<FieldT>(pb, {
+//             last_of_rho,
+//             r,
+//             length_padding
+//         }, ""));
+
+//         pb_linear_combination_array<FieldT> IV = SHA256_default_IV(pb);
+
+//         hasher1.reset(new sha256_compression_function_gadget<FieldT>(
+//             pb,
+//             IV,
+//             block1->bits,
+//             *intermediate_hash,
+//         ""));
+
+//         pb_linear_combination_array<FieldT> IV2(intermediate_hash->bits);
+
+//         hasher2.reset(new sha256_compression_function_gadget<FieldT>(
+//             pb,
+//             IV2,
+//             block2->bits,
+//             *result,
+//         ""));
+//     }
+
+//     void generate_r1cs_constraints() {
+//         hasher1->generate_r1cs_constraints();
+//         hasher2->generate_r1cs_constraints();
+//     }
+
+//     void generate_r1cs_witness() {
+//         hasher1->generate_r1cs_witness();
+//         hasher2->generate_r1cs_witness();
+//     }
+// };
+
+// template<typename FieldT>
+// class PRF_gadget : gadget<FieldT> {
+// private:
+//     std::shared_ptr<block_variable<FieldT>> block;
+//     std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher;
+//     std::shared_ptr<digest_variable<FieldT>> result;
+
+// public:
+//     PRF_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         bool a,
+//         bool b,
+//         bool c,
+//         bool d,
+//         pb_variable_array<FieldT> x,
+//         pb_variable_array<FieldT> y,
+//         std::shared_ptr<digest_variable<FieldT>> result
+//     ) : gadget<FieldT>(pb), result(result) {
+
+//         pb_linear_combination_array<FieldT> IV = SHA256_default_IV(pb);
+
+//         pb_variable_array<FieldT> discriminants;
+//         discriminants.emplace_back(a ? ONE : ZERO);
+//         discriminants.emplace_back(b ? ONE : ZERO);
+//         discriminants.emplace_back(c ? ONE : ZERO);
+//         discriminants.emplace_back(d ? ONE : ZERO);
+
+//         block.reset(new block_variable<FieldT>(pb, {
+//             discriminants,
+//             x,
+//             y
+//         }, "PRF_block"));
+
+//         hasher.reset(new sha256_compression_function_gadget<FieldT>(
+//             pb,
+//             IV,
+//             block->bits,
+//             *result,
+//         "PRF_hasher"));
+//     }
+
+//     void generate_r1cs_constraints() {
+//         hasher->generate_r1cs_constraints();
+//     }
+
+//     void generate_r1cs_witness() {
+//         hasher->generate_r1cs_witness();
+//     }
+// };
+
+// template<typename FieldT>
+// pb_variable_array<FieldT> gen256zeroes(pb_variable<FieldT>& ZERO) {
+//     pb_variable_array<FieldT> ret;
+//     while (ret.size() < 256) {
+//         ret.emplace_back(ZERO);
+//     }
+
+//     return ret;
+// }
+
+// template<typename FieldT>
+// class PRF_addr_a_pk_gadget : public PRF_gadget<FieldT> {
+// public:
+//     PRF_addr_a_pk_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         pb_variable_array<FieldT>& a_sk,
+//         std::shared_ptr<digest_variable<FieldT>> result
+//     ) : PRF_gadget<FieldT>(pb, ZERO, 1, 1, 0, 0, a_sk, gen256zeroes(ZERO), result) {}
+// };
+
+// template<typename FieldT>
+// class PRF_nf_gadget : public PRF_gadget<FieldT> {
+// public:
+//     PRF_nf_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         pb_variable_array<FieldT>& a_sk,
+//         pb_variable_array<FieldT>& rho,
+//         std::shared_ptr<digest_variable<FieldT>> result
+//     ) : PRF_gadget<FieldT>(pb, ZERO, 1, 1, 1, 0, a_sk, rho, result) {}
+// };
+
+// template<typename FieldT>
+// class PRF_pk_gadget : public PRF_gadget<FieldT> {
+// public:
+//     PRF_pk_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         pb_variable_array<FieldT>& a_sk,
+//         pb_variable_array<FieldT>& h_sig,
+//         bool nonce,
+//         std::shared_ptr<digest_variable<FieldT>> result
+//     ) : PRF_gadget<FieldT>(pb, ZERO, 0, nonce, 0, 0, a_sk, h_sig, result) {}
+// };
+
+// template<typename FieldT>
+// class PRF_rho_gadget : public PRF_gadget<FieldT> {
+// public:
+//     PRF_rho_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         pb_variable_array<FieldT>& phi,
+//         pb_variable_array<FieldT>& h_sig,
+//         bool nonce,
+//         std::shared_ptr<digest_variable<FieldT>> result
+//     ) : PRF_gadget<FieldT>(pb, ZERO, 0, nonce, 1, 0, phi, h_sig, result) {}
+// };
+
+// template<typename FieldT, typename HashT, size_t tree_depth>
+// class input_note_gadget : public note_gadget<FieldT> {
+// private:
+//     std::shared_ptr<digest_variable<FieldT>> a_pk;
+//     std::shared_ptr<digest_variable<FieldT>> rho;
+
+//     std::shared_ptr<digest_variable<FieldT>> commitment;
+//     std::shared_ptr<note_commitment_gadget<FieldT>> commit_to_inputs;
+
+//     pb_variable<FieldT> value_enforce;
+//     std::shared_ptr<gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>> witness_input;
+
+//     std::shared_ptr<PRF_addr_a_pk_gadget<FieldT>> spend_authority;
+//     std::shared_ptr<PRF_nf_gadget<FieldT>> expose_nullifiers;
+// public:
+//     std::shared_ptr<digest_variable<FieldT>> a_sk;
+
+//     input_note_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         std::shared_ptr<digest_variable<FieldT>> nullifier,
+//         digest_variable<FieldT> rt
+//     ) : note_gadget<FieldT>(pb) {
+//         a_sk.reset(new digest_variable<FieldT>(pb, 252, ""));
+//         a_pk.reset(new digest_variable<FieldT>(pb, 256, ""));
+//         rho.reset(new digest_variable<FieldT>(pb, 256, ""));
+//         commitment.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+//         spend_authority.reset(new PRF_addr_a_pk_gadget<FieldT>(
+//             pb,
+//             ZERO,
+//             a_sk->bits,
+//             a_pk
+//         ));
+
+//         expose_nullifiers.reset(new PRF_nf_gadget<FieldT>(
+//             pb,
+//             ZERO,
+//             a_sk->bits,
+//             rho->bits,
+//             nullifier
+//         ));
+
+//         commit_to_inputs.reset(new note_commitment_gadget<FieldT>(
+//             pb,
+//             ZERO,
+//             a_pk->bits,
+//             this->value,
+//             rho->bits,
+//             this->r->bits,
+//             commitment
+//         ));
+
+//         value_enforce.allocate(pb);
+
+//         witness_input.reset(new gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>(
+//             pb,
+//             *commitment,
+//             rt,
+//             value_enforce
+//         ));
+//     }
+
+//     void generate_r1cs_constraints() {
+//         note_gadget<FieldT>::generate_r1cs_constraints();
+
+//         a_sk->generate_r1cs_constraints();
+//         rho->generate_r1cs_constraints();
+
+//         spend_authority->generate_r1cs_constraints();
+//         expose_nullifiers->generate_r1cs_constraints();
+
+//         commit_to_inputs->generate_r1cs_constraints();
+
+//         // value * (1 - enforce) = 0
+//         // Given `enforce` is boolean constrained:
+//         // If `value` is zero, `enforce` _can_ be zero.
+//         // If `value` is nonzero, `enforce` _must_ be one.
+//         generate_boolean_r1cs_constraint<FieldT>(this->pb, value_enforce,"");
+
+//         this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(
+//             packed_addition(this->value),
+//             (1 - value_enforce),
+//             0
+//         ), "");
+
+//         witness_input->generate_r1cs_constraints();
+//     }
+
+//     void generate_r1cs_witness(
+//         const GuneroMerklePath& path,
+//         const SpendingKey& key,
+//         const Note& note
+//     ) {
+//         note_gadget<FieldT>::generate_r1cs_witness(note);
+
+//         // Witness a_sk for the input
+//         a_sk->bits.fill_with_bits(
+//             this->pb,
+//             uint252_to_bool_vector(key)
+//         );
+
+//         // Witness a_pk for a_sk with PRF_addr
+//         spend_authority->generate_r1cs_witness();
+
+//         // [SANITY CHECK] Witness a_pk with note information
+//         a_pk->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(note.a_pk)
+//         );
+
+//         // Witness rho for the input note
+//         rho->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(note.rho)
+//         );
+
+//         // Witness the nullifier for the input note
+//         expose_nullifiers->generate_r1cs_witness();
+
+//         // Witness the commitment of the input note
+//         commit_to_inputs->generate_r1cs_witness();
+
+//         // [SANITY CHECK] Ensure the commitment is
+//         // valid.
+//         commitment->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(note.cm())
+//         );
+
+//         // Set enforce flag for nonzero input value
+//         this->pb.val(value_enforce) = (note.value != 0) ? FieldT::one() : FieldT::zero();
+
+//         // Witness merkle tree authentication path
+//         witness_input->generate_r1cs_witness(path);
+//     }
+// };
+
+// template<typename FieldT>
+// class output_note_gadget : public note_gadget<FieldT> {
+// private:
+//     std::shared_ptr<digest_variable<FieldT>> rho;
+//     std::shared_ptr<digest_variable<FieldT>> a_pk;
+
+//     std::shared_ptr<PRF_rho_gadget<FieldT>> prevent_faerie_gold;
+//     std::shared_ptr<note_commitment_gadget<FieldT>> commit_to_outputs;
+
+// public:
+//     output_note_gadget(
+//         protoboard<FieldT>& pb,
+//         pb_variable<FieldT>& ZERO,
+//         pb_variable_array<FieldT>& phi,
+//         pb_variable_array<FieldT>& h_sig,
+//         bool nonce,
+//         std::shared_ptr<digest_variable<FieldT>> commitment
+//     ) : note_gadget<FieldT>(pb) {
+//         rho.reset(new digest_variable<FieldT>(pb, 256, ""));
+//         a_pk.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+//         // Do not allow the caller to choose the same "rho"
+//         // for any two valid notes in a given view of the
+//         // blockchain. See protocol specification for more
+//         // details.
+//         prevent_faerie_gold.reset(new PRF_rho_gadget<FieldT>(
+//             pb,
+//             ZERO,
+//             phi,
+//             h_sig,
+//             nonce,
+//             rho
+//         ));
+
+//         // Commit to the output notes publicly without
+//         // disclosing them.
+//         commit_to_outputs.reset(new note_commitment_gadget<FieldT>(
+//             pb,
+//             ZERO,
+//             a_pk->bits,
+//             this->value,
+//             rho->bits,
+//             this->r->bits,
+//             commitment
+//         ));
+//     }
+
+//     void generate_r1cs_constraints() {
+//         note_gadget<FieldT>::generate_r1cs_constraints();
+
+//         a_pk->generate_r1cs_constraints();
+
+//         prevent_faerie_gold->generate_r1cs_constraints();
+
+//         commit_to_outputs->generate_r1cs_constraints();
+//     }
+
+//     void generate_r1cs_witness(const Note& note) {
+//         note_gadget<FieldT>::generate_r1cs_witness(note);
+
+//         prevent_faerie_gold->generate_r1cs_witness();
+
+//         // [SANITY CHECK] Witness rho ourselves with the
+//         // note information.
+//         rho->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(note.rho)
+//         );
+
+//         a_pk->bits.fill_with_bits(
+//             this->pb,
+//             uint256_to_bool_vector(note.a_pk)
+//         );
+
+//         commit_to_outputs->generate_r1cs_witness();
+//     }
+// };
 
 // template<typename FieldT, typename HashT, size_t tree_depth>
 // class gunerotransfer_gadget : gadget<FieldT> {
@@ -2172,54 +2158,12 @@ template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class GuneroMembershipCircuit
 {
 public:
-    // r1cs_ppzksnark_proving_key<BaseT> pk;
-    // r1cs_ppzksnark_verification_key<BaseT> vk;
-    // r1cs_ppzksnark_processed_verification_key<BaseT> vk_precomp;
-    // std::string pkPath;
     const size_t digest_len;
 
     GuneroMembershipCircuit()
         : digest_len(HashT::get_digest_len())
     {}
     ~GuneroMembershipCircuit() {}
-
-    // void setProvingKeyPath(std::string path) {
-    //     pkPath = path;
-    // }
-
-    // void loadProvingKey() {
-    //     if (!pk) {
-    //         loadFromFile(pkPath, pk);
-    //     }
-    // }
-
-    // void saveProvingKey(std::string path) {
-    //     if (pk) {
-    //         saveToFile(path, pk);
-    //     } else {
-    //         throw std::runtime_error("cannot save proving key; key doesn't exist");
-    //     }
-    // }
-    // void loadVerifyingKey(std::string path) {
-    //     loadFromFile(path, vk);
-
-    //     processVerifyingKey();
-    // }
-    // void processVerifyingKey() {
-    //     vk_precomp = r1cs_ppzksnark_verifier_process_vk(*vk);
-    // }
-    // void saveVerifyingKey(std::string path) {
-    //     if (vk) {
-    //         saveToFile(path, *vk);
-    //     } else {
-    //         throw std::runtime_error("cannot save verifying key; key doesn't exist");
-    //     }
-    // }
-    // void saveR1CS(std::string path) {
-    //     auto r1cs = generate_r1cs();
-
-    //     saveToFile(path, r1cs);
-    // }
 
     // r1cs_constraint_system<FieldT> generate_r1cs() {
     //     protoboard<FieldT> pb;
@@ -2252,41 +2196,52 @@ public:
         GuneroMerklePath& p_path,
         libff::bit_vector& leaf,
         libff::bit_vector& root,
+        size_t digest_len_static,
         size_t tree_depth_static,
-        size_t digest_len_static
+        bool InclusiveRoot
     )
     {
         /* prepare test variables */
         libff::print_header("Gunero prepare test variables");
         std::vector<merkle_authentication_node> path(tree_depth_static);
-        // path = std::vector<merkle_authentication_node>(tree_depth_static);
 
         libff::bit_vector prev_hash(digest_len_static);
         std::generate(prev_hash.begin(), prev_hash.end(), [&]() { return std::rand() % 2; });
-        // libff::bit_vector leaf = prev_hash;
         leaf = prev_hash;
 
         libff::bit_vector address_bits;
 
         size_t address = 0;
-        // address = 0;
         for (long level = tree_depth_static-1; level >= 0; --level)
         {
+            //Generate random uncle position
             const bool computed_is_right = (std::rand() % 2);
             address |= (computed_is_right ? 1ul << (tree_depth_static-1-level) : 0);
             address_bits.push_back(computed_is_right);
-            libff::bit_vector other(digest_len_static);
-            std::generate(other.begin(), other.end(), [&]() { return std::rand() % 2; });
 
+            //Generate random uncle
+            libff::bit_vector uncle(digest_len_static);
+            std::generate(uncle.begin(), uncle.end(), [&]() { return std::rand() % 2; });
+
+            //Create block of prev_hash + uncle
             libff::bit_vector block = prev_hash;
-            block.insert(computed_is_right ? block.begin() : block.end(), other.begin(), other.end());
+            block.insert(computed_is_right ? block.begin() : block.end(), uncle.begin(), uncle.end());
+            //Compress block to new hash
             libff::bit_vector h = HashT::get_hash(block);
 
-            path[level] = other;
+            //Add uncle to path
+            path[level] = uncle;
 
+            if (InclusiveRoot && (level == 0))
+            {
+                root = prev_hash;
+            }
             prev_hash = h;
         }
-        root = prev_hash;
+        if (!InclusiveRoot)
+        {
+            root = prev_hash;
+        }
 
         p_path = GuneroMerklePath(path, address_bits);
 
@@ -2504,7 +2459,7 @@ int main () {
         libff::bit_vector root;
         GuneroMerklePath path;
 
-        gmc.makeTestVariables(path, leaf, root, MERKLE_TREE_DEPTH, sha256_two_to_one_hash_gadget<FieldT>::get_digest_len());
+        gmc.makeTestVariables(path, leaf, root, sha256_two_to_one_hash_gadget<FieldT>::get_digest_len(), MERKLE_TREE_DEPTH, true);
 
         saveToFile(leafPath, leaf);
         saveToFile(pathPath, path);
