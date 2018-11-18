@@ -21,25 +21,25 @@ namespace gunero {
 class GuneroMerklePath {
 public:
     std::vector<std::vector<bool>> authentication_path;
-    std::vector<bool> index;
+    std::vector<bool> index_account;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(authentication_path);
-        READWRITE(index);
+        READWRITE(index_account);
     }
 
     GuneroMerklePath() { }
 
-    GuneroMerklePath(std::vector<std::vector<bool>> authentication_path, std::vector<bool> index)
-    : authentication_path(authentication_path), index(index) { }
+    GuneroMerklePath(std::vector<std::vector<bool>> authentication_path, std::vector<bool> index_account)
+    : authentication_path(authentication_path), index_account(index_account) { }
 
     friend std::ostream& operator<<(std::ostream &out, const GuneroMerklePath &a)
     {
         out << a.authentication_path;
-        out << a.index;
+        out << a.index_account;
 
         return out;
     }
@@ -47,7 +47,7 @@ public:
     friend std::istream& operator>>(std::istream &in, GuneroMerklePath &a)
     {
         in >> a.authentication_path;
-        in >> a.index;
+        in >> a.index_account;
 
         return in;
     }
