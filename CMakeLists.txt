@@ -74,6 +74,12 @@ if("${VERBOSE}")
   add_definitions(-DVERBOSE=1)
 endif()
 
+set(CMAKE_BUILD_TYPE Debug)
+
+if("${DEBUG}")
+  add_definitions(-DDEBUG -g)
+endif()
+
 if("${MULTICORE}")
   add_definitions(-DMULTICORE=1)
 endif()
