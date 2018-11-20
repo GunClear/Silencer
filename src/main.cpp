@@ -13,16 +13,10 @@
 #include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
-// #ifndef CURVE_BN128
-// #define CURVE_BN128
-// #endif
 #ifndef ALT_BN128
 #define ALT_BN128
 #endif
 
-#ifdef CURVE_BN128
-//#include <libff/algebra/curves/bn128/bn128_pp.hpp>
-#endif
 #ifdef ALT_BN128
 // #include <libff/algebra/curves/alt_bn128/alt_bn128_init.hpp>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
@@ -47,25 +41,10 @@
 #include "crypto/sha256.h"
 #include "GuneroMerkleTree.hpp"
 
-#ifdef CURVE_BN128
-    // //bn128_pp
-    // typedef libff::Fr<libff::bn128_pp> FieldT;
-    // typedef libff::bn128_pp BaseT;
-#endif
-
 #ifdef ALT_BN128
     //alt_bn128_pp
     typedef libff::Fr<libff::alt_bn128_pp> FieldT;
     typedef libff::alt_bn128_pp BaseT;
-#endif
-
-#ifdef CURVE_BN128
-// typedef libff::bn128_pp::G1_type curve_G1;
-// typedef libff::bn128_pp::G2_type curve_G2;
-// typedef libff::bn128_pp::GT_type curve_GT;
-// typedef libff::bn128_pp::Fp_type curve_Fr;
-// typedef libff::bn128_pp::Fq_type curve_Fq;
-// typedef libff::bn128_pp::Fqe_type curve_Fq2;
 #endif
 
 #ifdef ALT_BN128
@@ -262,9 +241,6 @@ bool operator==(const r1cs_primary_input<FieldT> &left, const r1cs_primary_input
 #define ZC_MEMO_SIZE 512
 #define ZC_NOTEPLAINTEXT_SIZE (ZC_NOTEPLAINTEXT_LEADING + ZC_V_SIZE + ZC_RHO_SIZE + ZC_R_SIZE + ZC_MEMO_SIZE)
 
-// typedef NoteEncryption<ZC_NOTEPLAINTEXT_SIZE> ZCNoteEncryption;
-// typedef NoteDecryption<ZC_NOTEPLAINTEXT_SIZE> ZCNoteDecryption;
-
 // Convert boolean vector (big endian) to integer
 uint64_t convertVectorToInt(const std::vector<bool>& v) {
     if (v.size() > 64) {
@@ -280,13 +256,6 @@ uint64_t convertVectorToInt(const std::vector<bool>& v) {
 
     return result;
 }
-
-// template<typename FieldT>
-// linear_combination<FieldT> packed_addition_direct(pb_variable_array<FieldT> input) {
-//     return pb_packing_sum<FieldT>(pb_variable_array<FieldT>(
-//         input.rbegin(), input.rend()
-//     ));
-// }
 
 int div_ceil(int numerator, int denominator)
 {
@@ -377,8 +346,8 @@ template<typename FieldT, typename HashT, size_t tree_depth>
 class gunero_merkle_tree_gadget : gadget<FieldT> {
 private:
     pb_variable_array<FieldT> positions;
-    std::shared_ptr<merkle_authentication_path_variable<FieldT, HashT>> authvars;
-    std::shared_ptr<merkle_tree_check_read_gadget<FieldT, HashT>> auth;
+    std::shared_ptr<gunero_merkle_authentication_path_variable<FieldT, HashT>> authvars;
+    std::shared_ptr<gunero_merkle_tree_check_read_gadget<FieldT, HashT>> auth;
 
 public:
     gunero_merkle_tree_gadget(
@@ -389,10 +358,10 @@ public:
         const std::string &annotation_prefix
     ) : gadget<FieldT>(pb, annotation_prefix) {
         positions.allocate(pb, tree_depth);
-        authvars.reset(new merkle_authentication_path_variable<FieldT, HashT>(
+        authvars.reset(new gunero_merkle_authentication_path_variable<FieldT, HashT>(
             pb, tree_depth, "auth"
         ));
-        auth.reset(new merkle_tree_check_read_gadget<FieldT, HashT>(
+        auth.reset(new gunero_merkle_tree_check_read_gadget<FieldT, HashT>(
             pb,
             tree_depth,
             positions,
@@ -421,14 +390,13 @@ public:
         auth->generate_r1cs_constraints();
     }
 
-    void generate_r1cs_witness(const GuneroMerklePath& path) {
-        // TODO: Change libsnark so that it doesn't require this goofy
-        // number thing in its API.
-        size_t path_index_account = convertVectorToInt(path.index_account);
+    void generate_r1cs_witness(const std::vector<gunero_merkle_authentication_node>& M_account, const std::vector<bool>& A_account)
+    {
+        // uint256 path_A_account = bool_vector_to_uint256(A_account);
 
-        positions.fill_with_bits_of_ulong(this->pb, path_index_account);
+        positions.fill_with_bits(this->pb, A_account);
 
-        authvars->generate_r1cs_witness(path_index_account, path.authentication_path);
+        authvars->generate_r1cs_witness(A_account, M_account);
         auth->generate_r1cs_witness();
     }
 };
@@ -451,7 +419,6 @@ public:
 //2) Validate W == calc_root(A_account, N_account, M_account[160]) (User is authorized)
 //2 alt) Validate W == calc_root(A_account, keccak256(P_proof,N_account), M_account[160]) (User is authorized)
 //3) Validate V_account == keccak256(A_account, keccak256(W,r_account) (View Hash is consistent)
-//3 alt) ...
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class guneromembership_gadget : public gadget<FieldT> {
 public:
@@ -461,18 +428,23 @@ public:
     std::shared_ptr<multipacking_gadget<FieldT>> unpacker;
     std::shared_ptr<digest_variable<FieldT>> W;
     std::shared_ptr<digest_variable<FieldT>> N_account;
-    // std::shared_ptr<digest_variable<FieldT>> V_account;
+    std::shared_ptr<digest_variable<FieldT>> V_account;
 
     // Aux inputs
     pb_variable<FieldT> ZERO;
     std::shared_ptr<digest_variable<FieldT>> s_proof;
-    std::shared_ptr<gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>> M_account;
+    std::shared_ptr<gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>> gunero_merkle_tree;
+    std::shared_ptr<digest_variable<FieldT>> r_account;
+    std::shared_ptr<digest_variable<FieldT>> A_account;
 
     // Computed variables
     std::shared_ptr<digest_variable<FieldT>> P_proof;
     std::shared_ptr<PRF_addr_a_pk_gadget<FieldT>> spend_authority;
     std::shared_ptr<digest_variable<FieldT>> leaf_digest;
     std::shared_ptr<HashT> leaf_hasher;
+    std::shared_ptr<digest_variable<FieldT>> view_hash_1_digest;
+    std::shared_ptr<HashT> view_hash_1_hasher;
+    std::shared_ptr<HashT> view_hash_2_hasher;
 
     guneromembership_gadget(protoboard<FieldT>& pb)
         : gadget<FieldT>(pb, "guneromembership_gadget")
@@ -489,6 +461,7 @@ public:
 
             alloc_uint256(zk_unpacked_inputs, W);
             alloc_uint256(zk_unpacked_inputs, N_account);
+            alloc_uint256(zk_unpacked_inputs, V_account);
 
             assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
 
@@ -501,17 +474,6 @@ public:
                 FieldT::capacity(),
                 "unpacker"
             ));
-
-            // W.reset(new digest_variable<FieldT>(pb, 256, "root"));
-
-            // // N_account.allocate(pb, 2);
-            // // N_account.reset(new digest_variable<FieldT>(pb, 2, "status"));
-            // N_account.reset(new digest_variable<FieldT>(pb, 256, "status"));
-
-            // V_account.reset(new digest_variable<FieldT>(pb, 256, "view"));
-
-            // pb.set_input_sizes(verifying_field_element_size());
-            // pb.set_input_sizes(512);
         }
 
         // We need a constant "zero" variable in some contexts. In theory
@@ -542,12 +504,32 @@ public:
             *leaf_digest,
             "leaf_hasher"));
 
-        M_account.reset(new gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>(
+        gunero_merkle_tree.reset(new gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>(
             pb,
             *leaf_digest,
             *W,
             ONE,
-            "M_account"));
+            "gunero_merkle_tree"));
+
+        r_account.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+        view_hash_1_digest.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+        view_hash_1_hasher.reset(new HashT(
+            pb,
+            *W,
+            *r_account,
+            *view_hash_1_digest,
+            "view_hash_1_hasher"));
+
+        A_account.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+        view_hash_2_hasher.reset(new HashT(
+            pb,
+            *A_account,
+            *view_hash_1_digest,
+            *V_account,
+            "view_hash_2_hasher"));
     }
 
     ~guneromembership_gadget()
@@ -565,8 +547,8 @@ public:
         //acc += 2;
         acc += 256;
 
-        // //V_account
-        // acc += HashT::get_digest_len();
+        //V_account
+        acc += HashT::get_digest_len();
 
         return acc;
     }
@@ -587,12 +569,6 @@ public:
         // are boolean constrained.
         unpacker->generate_r1cs_constraints(true);
 
-        // W->generate_r1cs_constraints();
-
-        // N_account->generate_r1cs_constraints();
-
-        // V_account->generate_r1cs_constraints();
-
         // Constrain `ZERO`
         generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
 
@@ -607,7 +583,17 @@ public:
         leaf_hasher->generate_r1cs_constraints();
 
         // Constrain bitness of merkle_tree
-        M_account->generate_r1cs_constraints();
+        gunero_merkle_tree->generate_r1cs_constraints();
+
+        r_account->generate_r1cs_constraints();
+
+        view_hash_1_digest->generate_r1cs_constraints();
+
+        view_hash_1_hasher->generate_r1cs_constraints();
+
+        A_account->generate_r1cs_constraints();
+
+        view_hash_2_hasher->generate_r1cs_constraints();
 
         r1cs_constraint_system<FieldT> constraint_system = this->pb.get_constraint_system();
 
@@ -650,8 +636,11 @@ public:
     void generate_r1cs_witness(
         const libff::bit_vector& pW,
         const uint8_t pN_account,
+        const uint256& pV_account,
         const SpendingKey& ps_proof,
-        const GuneroMerklePath& pM_account
+        const std::vector<gunero_merkle_authentication_node>& pM_account,
+        const uint256& pA_account,
+        const uint256& pr_account
     )
     {
         // Witness rt. This is not a sanity check.
@@ -663,12 +652,14 @@ public:
         // Witness Status bits
         N_account->bits.fill_with_bits(
             this->pb,
-            //uint8_to_bool_vector(pN_account, 2)
             uint256_to_bool_vector(uint8_to_uint256(pN_account))
         );
 
-        //// Witness view hash
-        //V_account?????
+        // Witness view hash. This is not a sanity check.
+        V_account->bits.fill_with_bits(
+            this->pb,
+            uint256_to_bool_vector(pV_account)
+        );
 
         // Witness `zero`
         this->pb.val(ZERO) = FieldT::zero();
@@ -685,8 +676,32 @@ public:
         // Witness hash(P_proof, N_account) = leaf_digest
         leaf_hasher->generate_r1cs_witness();
 
+        //Trim account to correct size
+        // A_account_padded = libff::bit_vector(HashT::get_digest_len() - A_account.size());
+        // A_account_padded.insert(A_account_padded.begin(), A_account.begin(), A_account.end());
+        libff::bit_vector A_account_padded = uint256_to_bool_vector(pA_account);
+        A_account_padded.erase(A_account_padded.begin() + tree_depth, A_account_padded.end());
+
         // Witness merkle tree authentication path
-        M_account->generate_r1cs_witness(pM_account);
+        gunero_merkle_tree->generate_r1cs_witness(pM_account, A_account_padded);
+
+        // Witness r_account for the input
+        r_account->bits.fill_with_bits(
+            this->pb,
+            uint256_to_bool_vector(pr_account)
+        );
+
+        // Witness hash(W, r_account) = view_hash_1_digest
+        view_hash_1_hasher->generate_r1cs_witness();
+
+        // Witness A_account for the input
+        A_account->bits.fill_with_bits(
+            this->pb,
+            uint256_to_bool_vector(pA_account)
+        );
+
+        // Witness hash(A_account, view_hash_1_digest) = V_account
+        view_hash_2_hasher->generate_r1cs_witness();
 
         // [SANITY CHECK] Ensure that the intended root
         // was witnessed by the inputs, even if the read
@@ -699,6 +714,17 @@ public:
             pW
         );
 
+        // [SANITY CHECK] Ensure that the intended root
+        // was witnessed by the inputs, even if the read
+        // gadget overwrote it. This allows the prover to
+        // fail instead of the verifier, in the event that
+        // the roots of the inputs do not match the
+        // hash provided to the proving hashers.
+        V_account->bits.fill_with_bits(
+            this->pb,
+            uint256_to_bool_vector(pV_account)
+        );
+
         // This happens last, because only by now are all the
         // verifier inputs resolved.
         unpacker->generate_r1cs_witness_from_bits();
@@ -706,7 +732,8 @@ public:
 
     static r1cs_primary_input<FieldT> witness_map(
         const uint256& pW,
-        const uint8_t& pN_account
+        const uint8_t& pN_account,
+        const uint256& pV_account
     ) {
         std::vector<bool> verify_inputs;
 
@@ -714,6 +741,8 @@ public:
 
         //insert_uint_bits(verify_inputs, status, 2);
         insert_uint256(verify_inputs, uint8_to_uint256(pN_account));
+
+        insert_uint256(verify_inputs, pV_account);
 
         assert(verify_inputs.size() == verifying_input_bit_size());
         auto verify_field_elements = libff::pack_bit_vector_into_field_element_vector<FieldT>(verify_inputs);
@@ -1010,7 +1039,7 @@ curve_G1 CompressedG1::to_libsnark_g1() const
     // y = +/- sqrt(x^3 + b)
     auto y_coordinate = ((x_coordinate.squared() * x_coordinate) + libff::alt_bn128_coeff_b).sqrt();
 #else
-    CARP();
+#error ALT_BN128 must be used
 #endif
 
     if ((y_coordinate.as_bigint().data[0] & 1) != y_lsb) {
@@ -1099,7 +1128,7 @@ curve_G2 CompressedG2::to_libsnark_g2() const
 #ifdef ALT_BN128
     auto y_coordinate = ((x_coordinate.squared() * x_coordinate) + libff::alt_bn128_twist_coeff_b).sqrt();
 #else
-    CARP();
+#error ALT_BN128 must be used
 #endif
     auto y_coordinate_neg = -y_coordinate;
 
@@ -1117,7 +1146,7 @@ curve_G2 CompressedG2::to_libsnark_g2() const
 #ifdef ALT_BN128
     if (libff::alt_bn128_modulus_r * r != curve_G2::zero()) {
 #else
-    CARP(); {
+#error ALT_BN128 must be used
 #endif
         throw std::runtime_error("point is not in G2");
     }
@@ -1416,7 +1445,7 @@ template<typename FieldT>
 class keccak256_two_to_one_hash_gadget : public gadget<FieldT> {
 public:
     typedef libff::bit_vector hash_value_type;
-    typedef merkle_authentication_path merkle_authentication_path_type;
+    //typedef merkle_authentication_path merkle_authentication_path_type;
 
     std::shared_ptr<sha256_compression_function_gadget<FieldT> > f;
 
@@ -1441,6 +1470,187 @@ public:
     //static size_t expected_constraints(const bool ensure_output_bitness=true); // ignored
 };
 
+
+template<typename FieldT, typename HashT>
+gunero_merkle_authentication_path_variable<FieldT, HashT>::gunero_merkle_authentication_path_variable(protoboard<FieldT> &pb,
+                                                                                        const size_t tree_depth,
+                                                                                        const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix),
+    tree_depth(tree_depth)
+{
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        left_digests.emplace_back(digest_variable<FieldT>(pb, HashT::get_digest_len(), FMT(annotation_prefix, " left_digests_%zu", i)));
+        right_digests.emplace_back(digest_variable<FieldT>(pb, HashT::get_digest_len(), FMT(annotation_prefix, " right_digests_%zu", i)));
+    }
+}
+
+template<typename FieldT, typename HashT>
+void gunero_merkle_authentication_path_variable<FieldT, HashT>::generate_r1cs_constraints()
+{
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        left_digests[i].generate_r1cs_constraints();
+        right_digests[i].generate_r1cs_constraints();
+    }
+}
+
+template<typename FieldT, typename HashT>
+void gunero_merkle_authentication_path_variable<FieldT, HashT>::generate_r1cs_witness(const libff::bit_vector address, const gunero_merkle_authentication_path &path)
+{
+    assert(address.size() == tree_depth);
+    assert(path.size() == tree_depth);
+
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        //if (address & (1ul << (tree_depth-1-i)))
+        //if (address.at(tree_depth-1-i))
+        if (address.at(i))
+        {
+            left_digests[i].generate_r1cs_witness(path[i]);
+        }
+        else
+        {
+            right_digests[i].generate_r1cs_witness(path[i]);
+        }
+    }
+}
+
+template<typename FieldT, typename HashT>
+gunero_merkle_authentication_path gunero_merkle_authentication_path_variable<FieldT, HashT>::get_authentication_path(const libff::bit_vector address) const
+{
+    gunero_merkle_authentication_path result;
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        //if (address & (1ul << (tree_depth-1-i)))
+        //if (address.at(tree_depth-1-i))
+        if (address.at(i))
+        {
+            result.emplace_back(left_digests[i].get_digest());
+        }
+        else
+        {
+            result.emplace_back(right_digests[i].get_digest());
+        }
+    }
+
+    return result;
+}
+
+template<typename FieldT, typename HashT>
+gunero_merkle_tree_check_read_gadget<FieldT, HashT>::gunero_merkle_tree_check_read_gadget(protoboard<FieldT> &pb,
+                                                                            const size_t tree_depth,
+                                                                            const pb_linear_combination_array<FieldT> &address_bits,
+                                                                            const digest_variable<FieldT> &leaf,
+                                                                            const digest_variable<FieldT> &root,
+                                                                            const gunero_merkle_authentication_path_variable<FieldT, HashT> &path,
+                                                                            const pb_linear_combination<FieldT> &read_successful,
+                                                                            const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix),
+    digest_size(HashT::get_digest_len()),
+    tree_depth(tree_depth),
+    address_bits(address_bits),
+    leaf(leaf),
+    root(root),
+    path(path),
+    read_successful(read_successful)
+{
+    /*
+       The tricky part here is ordering. For Merkle tree
+       authentication paths, path[0] corresponds to one layer below
+       the root (and path[tree_depth-1] corresponds to the layer
+       containing the leaf), while address_bits has the reverse order:
+       address_bits[0] is LSB, and corresponds to layer containing the
+       leaf, and address_bits[tree_depth-1] is MSB, and corresponds to
+       the subtree directly under the root.
+    */
+    assert(tree_depth > 0);
+    assert(tree_depth == address_bits.size());
+
+    for (size_t i = 0; i < tree_depth-1; ++i)
+    {
+        internal_output.emplace_back(digest_variable<FieldT>(pb, digest_size, FMT(this->annotation_prefix, " internal_output_%zu", i)));
+    }
+
+    computed_root.reset(new digest_variable<FieldT>(pb, digest_size, FMT(this->annotation_prefix, " computed_root")));
+
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        block_variable<FieldT> inp(pb, path.left_digests[i], path.right_digests[i], FMT(this->annotation_prefix, " inp_%zu", i));
+        hasher_inputs.emplace_back(inp);
+        hashers.emplace_back(HashT(pb, 2*digest_size, inp, (i == 0 ? *computed_root : internal_output[i-1]),
+                                   FMT(this->annotation_prefix, " load_hashers_%zu", i)));
+    }
+
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        /*
+          The propagators take a computed hash value (or leaf in the
+          base case) and propagate it one layer up, either in the left
+          or the right slot of authentication_path_variable.
+        */
+        propagators.emplace_back(digest_selector_gadget<FieldT>(pb, digest_size, i < tree_depth - 1 ? internal_output[i] : leaf,
+                                                                address_bits[tree_depth-1-i], path.left_digests[i], path.right_digests[i],
+                                                                FMT(this->annotation_prefix, " digest_selector_%zu", i)));
+    }
+
+    check_root.reset(new bit_vector_copy_gadget<FieldT>(pb, computed_root->bits, root.bits, read_successful, FieldT::capacity(), FMT(annotation_prefix, " check_root")));
+}
+
+template<typename FieldT, typename HashT>
+void gunero_merkle_tree_check_read_gadget<FieldT, HashT>::generate_r1cs_constraints()
+{
+    /* ensure correct hash computations */
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        // Note that we check root outside and have enforced booleanity of path.left_digests/path.right_digests outside in path.generate_r1cs_constraints
+        hashers[i].generate_r1cs_constraints(false);
+    }
+
+    /* ensure consistency of path.left_digests/path.right_digests with internal_output */
+    for (size_t i = 0; i < tree_depth; ++i)
+    {
+        propagators[i].generate_r1cs_constraints();
+    }
+
+    check_root->generate_r1cs_constraints(false, false);
+}
+
+template<typename FieldT, typename HashT>
+void gunero_merkle_tree_check_read_gadget<FieldT, HashT>::generate_r1cs_witness()
+{
+    /* do the hash computations bottom-up */
+    for (int i = tree_depth-1; i >= 0; --i)
+    {
+        /* propagate previous input */
+        propagators[i].generate_r1cs_witness();
+
+        /* compute hash */
+        hashers[i].generate_r1cs_witness();
+    }
+
+    check_root->generate_r1cs_witness();
+}
+
+template<typename FieldT, typename HashT>
+size_t gunero_merkle_tree_check_read_gadget<FieldT, HashT>::root_size_in_bits()
+{
+    return HashT::get_digest_len();
+}
+
+template<typename FieldT, typename HashT>
+size_t gunero_merkle_tree_check_read_gadget<FieldT, HashT>::expected_constraints(const size_t tree_depth)
+{
+    /* NB: this includes path constraints */
+    const size_t hasher_constraints = tree_depth * HashT::expected_constraints(false);
+    const size_t propagator_constraints = tree_depth * HashT::get_digest_len();
+    const size_t authentication_path_constraints = 2 * tree_depth * HashT::get_digest_len();
+    const size_t check_root_constraints = 3 * libff::div_ceil(HashT::get_digest_len(), FieldT::capacity());
+
+    return hasher_constraints + propagator_constraints + authentication_path_constraints + check_root_constraints;
+}
+
+
 ///// MEMBERSHIP PROOF /////
 // Public Parameters:
 // Authorization Root Hash (W)
@@ -1459,7 +1669,6 @@ public:
 //2) Validate W == calc_root(A_account, N_account, M_account[160]) (User is authorized)
 //2 alt) Validate W == calc_root(A_account, keccak256(P_proof,N_account), M_account[160]) (User is authorized)
 //3) Validate V_account == keccak256(A_account, keccak256(W,r_account) (View Hash is consistent)
-//3 alt) ...
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class GuneroMembershipCircuit
 {
@@ -1477,21 +1686,24 @@ public:
         guneromembership_gadget<FieldT, BaseT, HashT, tree_depth> gunero(pb);
 
         gunero.generate_r1cs_constraints(r1csPath, pkPath, vkPath);
-     }
+    }
 
-    //template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
     static void makeTestVariables(
         const libff::bit_vector& s_proof,
         const libff::bit_vector& N_account,
+        const libff::bit_vector& r_account,
         libff::bit_vector& P_proof,
         libff::bit_vector& leaf,
-        GuneroMerklePath& p_path,
-        libff::bit_vector& W
+        std::vector<gunero_merkle_authentication_node>& M_account,
+        libff::bit_vector& A_account_padded,
+        libff::bit_vector& W,
+        libff::bit_vector& view_hash_1,
+        libff::bit_vector& V_account
     )
     {
         /* prepare test variables */
         libff::print_header("Gunero prepare test variables");
-        std::vector<merkle_authentication_node> path(tree_depth);
+        M_account = std::vector<gunero_merkle_authentication_node>(tree_depth);
 
         assert(s_proof.size() == HashT::get_digest_len());
         assert(N_account.size() == HashT::get_digest_len());
@@ -1514,7 +1726,8 @@ public:
         assert(leaf.size() == HashT::get_digest_len());
         libff::bit_vector prev_hash = leaf;
 
-        libff::bit_vector address_bits;
+        // libff::bit_vector address_bits;
+        libff::bit_vector A_account(tree_depth);
 
         size_t address = 0;
         for (long level = tree_depth-1; level >= 0; --level)
@@ -1522,7 +1735,8 @@ public:
             //Generate random uncle position
             const bool computed_is_right = (std::rand() % 2);
             address |= (computed_is_right ? 1ul << (tree_depth-1-level) : 0);
-            address_bits.push_back(computed_is_right);
+            // address_bits.push_back(computed_is_right);
+            A_account.at(level) = computed_is_right;
 
             //Generate random uncle
             libff::bit_vector uncle(HashT::get_digest_len());
@@ -1535,14 +1749,28 @@ public:
             libff::bit_vector h = HashT::get_hash(block);
 
             //Add uncle to path
-            path[level] = uncle;
+            M_account[level] = uncle;
 
             prev_hash = h;
         }
 
         W = prev_hash;
 
-        p_path = GuneroMerklePath(path, address_bits);
+        A_account_padded = libff::bit_vector(HashT::get_digest_len() - A_account.size());
+        A_account_padded.insert(A_account_padded.begin(), A_account.begin(), A_account.end());
+
+        assert(A_account_padded.size() == HashT::get_digest_len());
+        assert(r_account.size() == HashT::get_digest_len());
+        {//view_hash_1 = hash(P_proof,N_account)
+            libff::bit_vector block = W;
+            block.insert(block.end(), r_account.begin(), r_account.end());
+            view_hash_1 = HashT::get_hash(block);//hash(W, r_account)
+
+            //V_account = hash(A_account_padded, hash(W, r_account))
+            block = A_account_padded;
+            block.insert(block.end(), view_hash_1.begin(), view_hash_1.end());
+            V_account = HashT::get_hash(block);//hash(A_account_padded, view_hash_1)
+        }
 
         printf("\n"); libff::print_indent(); libff::print_mem("after prepare test variables"); libff::print_time("after prepare test variables");
     }
@@ -1550,23 +1778,19 @@ public:
     bool prove(
         const libff::bit_vector& pW,
         const uint8_t pN_account,
+        const uint256& pV_account,
         const SpendingKey& ps_proof,
-        const GuneroMerklePath& pM_account,
+        const std::vector<gunero_merkle_authentication_node>& pM_account,
+        const uint256& pA_account,
+        const uint256& pr_account,
         const r1cs_ppzksnark_proving_key<BaseT>& pk,
         const r1cs_ppzksnark_verification_key<BaseT>& vk,
-        //r1cs_primary_input<FieldT>& primary_input,
         ZCProof& proof
-        // r1cs_ppzksnark_proof<BaseT> r1cs_proof
     )
     {
         libff::print_header("Gunero witness (proof)");
 
         {
-            // libff::print_header("Gunero loadFromFile(pk)");
-            // r1cs_ppzksnark_proving_key<BaseT> pk;
-            // loadFromFile(pkPath, pk);
-            // printf("\n"); libff::print_indent(); libff::print_mem("after Gunero loadFromFile(pk)"); libff::print_time("after Gunero loadFromFile(pk)");
-
             r1cs_primary_input<FieldT> primary_input;
             r1cs_auxiliary_input<FieldT> aux_input;
             {
@@ -1579,8 +1803,11 @@ public:
                     gunero.generate_r1cs_witness(
                         pW,
                         pN_account,
+                        pV_account,
                         ps_proof,
-                        pM_account
+                        pM_account,
+                        pA_account,
+                        pr_account
                     );
 
                     printf("\n"); libff::print_indent(); libff::print_mem("after guneromembership_gadget.load_r1cs_constraints()"); libff::print_time("after guneromembership_gadget.load_r1cs_constraints()");
@@ -1604,7 +1831,9 @@ public:
                 {
                     r1cs_primary_input<FieldT> primary_input_test = guneromembership_gadget<FieldT, BaseT, HashT, tree_depth>::witness_map(
                         bool_vector_to_uint256(pW),
-                        pN_account);
+                        pN_account,
+                        pV_account
+                    );
                     assert(primary_input == primary_input_test);
                 }
             }
@@ -1625,7 +1854,9 @@ public:
         {
             r1cs_primary_input<FieldT> primary_input = guneromembership_gadget<FieldT, BaseT, HashT, tree_depth>::witness_map(
                 bool_vector_to_uint256(pW),
-                pN_account);
+                pN_account,
+                pV_account
+            );
 
             return r1cs_ppzksnark_verifier_strong_IC<BaseT>(vk, primary_input, proof.to_libsnark_proof<r1cs_ppzksnark_proof<BaseT>>());
         }
@@ -1635,6 +1866,7 @@ public:
         //const r1cs_primary_input<FieldT>& primary_input,
         uint256 W,
         uint8_t N_account,
+        uint256 V_account,
         const ZCProof& proof,
         const r1cs_ppzksnark_verification_key<BaseT>& vk,
         const r1cs_ppzksnark_processed_verification_key<BaseT>& vk_precomp
@@ -1644,12 +1876,9 @@ public:
         {
             r1cs_primary_input<FieldT> primary_input = guneromembership_gadget<FieldT, BaseT, HashT, tree_depth>::witness_map(
                 W,
-                N_account);
-
-            // protoboard<FieldT> pb;
-            // {
-            //     guneromembership_gadget<FieldT, BaseT, HashT, tree_depth> gunero(pb);
-            // }
+                N_account,
+                V_account
+            );
 
             r1cs_ppzksnark_proof<BaseT> r1cs_proof = proof.to_libsnark_proof<r1cs_ppzksnark_proof<BaseT>>();
 
@@ -1683,51 +1912,26 @@ public:
 int main () {
     libff::start_profiling();
 
-#ifdef CURVE_BN128
-    // //bn128_pp
-    // libff::bn128_pp::init_public_params();
-#endif
-
 #ifdef ALT_BN128
     //alt_bn128_pp
     libff::init_alt_bn128_params();
 #endif
 
-#define MERKLE_TREE_DEPTH 160
+#define MERKLE_TREE_DEPTH 3
 
     //Test SHA256
-    uint256 PRF_addr_a_pk_one_calc;
-    {
-        {
-            const libff::bit_vector left_bv = libff::int_list_to_bits({0x426bc2d8, 0x4dc86782, 0x81e8957a, 0x409ec148, 0xe6cffbe8, 0xafe6ba4f, 0x9c6f1978, 0xdd7af7e9}, 32);
-            const libff::bit_vector right_bv = libff::int_list_to_bits({0x038cce42, 0xabd366b8, 0x3ede7e00, 0x9130de53, 0x72cdf73d, 0xee825114, 0x8cb48d1b, 0x9af68ad0}, 32);
-            const libff::bit_vector hash_bv = libff::int_list_to_bits({0xeffd0b7f, 0x1ccba116, 0x2ee816f7, 0x31c62b48, 0x59305141, 0x990e5c0a, 0xce40d33d, 0x0b1167d1}, 32);
+    // {
+    //     const libff::bit_vector left_bv = libff::int_list_to_bits({0x426bc2d8, 0x4dc86782, 0x81e8957a, 0x409ec148, 0xe6cffbe8, 0xafe6ba4f, 0x9c6f1978, 0xdd7af7e9}, 32);
+    //     const libff::bit_vector right_bv = libff::int_list_to_bits({0x038cce42, 0xabd366b8, 0x3ede7e00, 0x9130de53, 0x72cdf73d, 0xee825114, 0x8cb48d1b, 0x9af68ad0}, 32);
+    //     const libff::bit_vector hash_bv = libff::int_list_to_bits({0xeffd0b7f, 0x1ccba116, 0x2ee816f7, 0x31c62b48, 0x59305141, 0x990e5c0a, 0xce40d33d, 0x0b1167d1}, 32);
 
-            libff::bit_vector block;
-            block.insert(block.end(), left_bv.begin(), left_bv.end());
-            block.insert(block.end(), right_bv.begin(), right_bv.end());
-            libff::bit_vector hash_bv_calc = sha256_two_to_one_hash_gadget<FieldT>::get_hash(block);
+    //     libff::bit_vector block;
+    //     block.insert(block.end(), left_bv.begin(), left_bv.end());
+    //     block.insert(block.end(), right_bv.begin(), right_bv.end());
+    //     libff::bit_vector hash_bv_calc = sha256_two_to_one_hash_gadget<FieldT>::get_hash(block);
 
-            assert(hash_bv_calc == hash_bv);
-        }
-        {
-            libff::bit_vector one_lsb(252);
-            one_lsb.at(251) = true;
-
-            libff::bit_vector zero_lsb(256);
-
-            //1 1 0 0 + a_sk(252) + 0(256)
-            libff::bit_vector block(4);
-            block.at(0) = true;
-            block.at(1) = true;
-            block.insert(block.end(), one_lsb.begin(), one_lsb.end());
-            block.insert(block.end(), zero_lsb.begin(), zero_lsb.end());
-
-            libff::bit_vector PRF_addr_a_pk_one_lsb_calc = sha256_two_to_one_hash_gadget<FieldT>::get_hash(block);
-
-            PRF_addr_a_pk_one_calc = bool_vector_to_uint256(PRF_addr_a_pk_one_lsb_calc);
-        }
-    }
+    //     assert(hash_bv_calc == hash_bv);
+    // }
 
     std::string r1csPath = "/home/sean/Silencer/build/src/r1cs.bin";
     std::string pkPath = "/home/sean/Silencer/build/src/pk.bin";
@@ -1753,41 +1957,93 @@ int main () {
     //2) Validate W == calc_root(A_account, N_account, M_account[160]) (User is authorized)
     //2 alt) Validate W == calc_root(A_account, keccak256(P_proof,N_account), M_account[160]) (User is authorized)
     //3) Validate V_account == keccak256(A_account, keccak256(W,r_account) (View Hash is consistent)
-    //3 alt) ...
 
     //Public Input variables
     uint8_t N_account = 1;//1 = authorized
-    //uint256 V_account;
     //Private Input variables
-    //uint252 s_account;
-    // uint160 A_account;//alt
-    uint256 s_proof(uint8_to_uint256(1));//alt,SpendingKey
-    //std::vector<std::vector<bool>> M_account;//length = 160
-    uint256 r_account;
+    uint256 s_proof = uint8_to_uint256(1);//alt,SpendingKey
+
+    //Private Input variables
+    uint256 r_account;// = 0
 
     //Storage variables
     SpendingKey s_proofkey = SpendingKey(uint252(s_proof));
-    libff::bit_vector leaf;
-    GuneroMerklePath M_account;//M_account, A_account;
+    std::vector<gunero_merkle_authentication_node> M_account;
+    uint256 A_account;
     libff::bit_vector W_lsb;
+    uint256 V_account;
 
     //Make test
     {
-        libff::bit_vector s_proof_lsb(uint256_to_bool_vector(s_proof));
         libff::bit_vector N_account_lsb(uint256_to_bool_vector(uint8_to_uint256(N_account)));
+
+        uint256 PRF_addr_a_pk_one_calc;
+        uint256 leaf_calc;
+        {
+            libff::bit_vector PRF_addr_a_pk_one_lsb_calc;
+            {
+                libff::bit_vector one_lsb(252);
+                one_lsb.at(251) = true;
+
+                libff::bit_vector zero_lsb(256);
+
+                //1 1 0 0 + a_sk(252) + 0(256)
+                libff::bit_vector block(4);
+                block.at(0) = true;
+                block.at(1) = true;
+                block.insert(block.end(), one_lsb.begin(), one_lsb.end());
+                block.insert(block.end(), zero_lsb.begin(), zero_lsb.end());
+
+                PRF_addr_a_pk_one_lsb_calc = sha256_two_to_one_hash_gadget<FieldT>::get_hash(block);
+
+                PRF_addr_a_pk_one_calc = bool_vector_to_uint256(PRF_addr_a_pk_one_lsb_calc);
+            }
+            {
+                //leaf = hash(P_proof,N_account)
+                libff::bit_vector block;
+                block.insert(block.end(), PRF_addr_a_pk_one_lsb_calc.begin(), PRF_addr_a_pk_one_lsb_calc.end());
+                block.insert(block.end(), N_account_lsb.begin(), N_account_lsb.end());
+
+                libff::bit_vector leaf_lsb_calc = sha256_two_to_one_hash_gadget<FieldT>::get_hash(block);
+
+                leaf_calc = bool_vector_to_uint256(leaf_lsb_calc);
+            }
+        }
+
+        libff::bit_vector s_proof_lsb(uint256_to_bool_vector(s_proof));
+        libff::bit_vector r_account_lsb(uint256_to_bool_vector(r_account));
         libff::bit_vector P_proof;//alt
+        libff::bit_vector leaf;//alt
+        libff::bit_vector view_hash_1_lsb;//alt
+        libff::bit_vector A_account_padded_lsb;
+        libff::bit_vector V_account_lsb;
 
         GuneroMembershipCircuit<FieldT, BaseT, sha256_two_to_one_hash_gadget<FieldT>, MERKLE_TREE_DEPTH>::makeTestVariables(
             s_proof_lsb,
             N_account_lsb,
+            r_account_lsb,
             P_proof,
             leaf,
             M_account,
-            W_lsb);
+            A_account_padded_lsb,
+            W_lsb,
+            view_hash_1_lsb,
+            V_account_lsb
+            );
 
         uint256 P_proof_msb = bool_vector_to_uint256(P_proof);
 
         assert(P_proof_msb == PRF_addr_a_pk_one_calc);
+
+        uint256 leaf_msb = bool_vector_to_uint256(leaf);
+
+        assert(leaf_msb == leaf_calc);
+
+        r_account = bool_vector_to_uint256(r_account_lsb);
+
+        A_account = bool_vector_to_uint256(A_account_padded_lsb);
+
+        V_account = bool_vector_to_uint256(V_account_lsb);
     }
 
     //Generate
@@ -1814,8 +2070,11 @@ int main () {
         bool proven = gmc.prove(
             W_lsb,
             N_account,
+            V_account,
             s_proofkey,
             M_account,
+            A_account,
+            r_account,
             pk,
             vk,
             proof);
@@ -1842,6 +2101,7 @@ int main () {
         bool verified = gmc.verify(
             W,
             N_account,
+            V_account,
             proof,
             vk,
             vk_precomp);
@@ -1862,4 +2122,3 @@ int main () {
 
     return 0;
 }
-

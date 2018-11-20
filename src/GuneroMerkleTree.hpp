@@ -5,183 +5,140 @@
 #include <boost/optional.hpp>
 #include <boost/static_assert.hpp>
 #include <libff/common/utils.hpp>
+#include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
+#include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
+#include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_examples.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/uscs_ppzksnark/uscs_ppzksnark.hpp>
+#include <libff/algebra/fields/field_utils.hpp>
+#include <libff/algebra/scalar_multiplication/multiexp.hpp>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <libff/algebra/curves/edwards/edwards_pp.hpp>
+#include <libff/algebra/curves/mnt/mnt4/mnt4_pp.hpp>
+#include <libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp>
+#include <libff/common/utils.hpp>
+
+#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
+#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
+#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 
 #include "zcash/uint256.h"
 #include "serialize.h"
 
 #include "zcash/Zcash.h"
 
-std::ostream& operator<<(std::ostream &out, const libff::bit_vector &a);
-std::istream& operator>>(std::istream &in, libff::bit_vector &a);
-std::ostream& operator<<(std::ostream &out, const std::vector<libff::bit_vector> &a);
-std::istream& operator>>(std::istream &in, std::vector<libff::bit_vector> &a);
+using namespace libsnark;
+// using namespace libzcash;
+
+// std::ostream& operator<<(std::ostream &out, const libff::bit_vector &a);
+// std::istream& operator>>(std::istream &in, libff::bit_vector &a);
+// std::ostream& operator<<(std::ostream &out, const std::vector<libff::bit_vector> &a);
+// std::istream& operator>>(std::istream &in, std::vector<libff::bit_vector> &a);
 
 namespace gunero {
 
-class GuneroMerklePath {
+/**
+ * A Merkle tree is maintained as two maps:
+ * - a map from addresses to values, and
+ * - a map from addresses to hashes.
+ *
+ * The second map maintains the intermediate hashes of a Merkle tree
+ * built atop the values currently stored in the tree (the
+ * implementation admits a very efficient support for sparse
+ * trees). Besides offering methods to load and store values, the
+ * class offers methods to retrieve the root of the Merkle tree and to
+ * obtain the authentication paths for (the value at) a given address.
+ */
+
+typedef libff::bit_vector gunero_merkle_authentication_node;
+typedef std::vector<gunero_merkle_authentication_node> gunero_merkle_authentication_path;
+
+template<typename HashT>
+class gunero_merkle_tree {
+private:
+
+    typedef typename HashT::hash_value_type hash_value_type;
+    typedef typename HashT::merkle_authentication_path_type gunero_merkle_authentication_path_type;
+
 public:
-    std::vector<std::vector<bool>> authentication_path;
-    std::vector<bool> index_account;
 
-    ADD_SERIALIZE_METHODS;
+    std::vector<hash_value_type> hash_defaults;
+    std::map<size_t, libff::bit_vector> values;
+    std::map<size_t, hash_value_type> hashes;
 
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(authentication_path);
-        READWRITE(index_account);
-    }
+    size_t depth;
+    size_t value_size;
+    size_t digest_size;
 
-    GuneroMerklePath() { }
+    gunero_merkle_tree(const size_t depth, const size_t value_size);
+    gunero_merkle_tree(const size_t depth, const size_t value_size, const std::vector<libff::bit_vector> &contents_as_vector);
+    gunero_merkle_tree(const size_t depth, const size_t value_size, const std::map<size_t, libff::bit_vector> &contents);
 
-    GuneroMerklePath(std::vector<std::vector<bool>> authentication_path, std::vector<bool> index_account)
-    : authentication_path(authentication_path), index_account(index_account) { }
+    libff::bit_vector get_value(const libff::bit_vector address) const;
+    void set_value(const libff::bit_vector address, const libff::bit_vector &value);
 
-    friend std::ostream& operator<<(std::ostream &out, const GuneroMerklePath &a)
-    {
-        out << a.authentication_path;
-        out << a.index_account;
+    hash_value_type get_root() const;
+    gunero_merkle_authentication_path_type get_path(const libff::bit_vector address) const;
 
-        return out;
-    }
-
-    friend std::istream& operator>>(std::istream &in, GuneroMerklePath &a)
-    {
-        in >> a.authentication_path;
-        in >> a.index_account;
-
-        return in;
-    }
+    void dump() const;
 };
 
-template <size_t Depth, typename Hash>
-class GuneroWitness;
-
-template<size_t Depth, typename Hash>
-class EmptyMerkleRoots {
+template<typename FieldT, typename HashT>
+class gunero_merkle_authentication_path_variable : public gadget<FieldT> {
 public:
-    EmptyMerkleRoots() {
-        empty_roots.at(0) = Hash();
-        for (size_t d = 1; d <= Depth; d++) {
-            empty_roots.at(d) = Hash::combine(empty_roots.at(d-1), empty_roots.at(d-1));
-        }
-    }
-    Hash empty_root(size_t depth) {
-        return empty_roots.at(depth);
-    }
-    template <size_t D, typename H>
-    friend bool operator==(const EmptyMerkleRoots<D, H>& a,
-                           const EmptyMerkleRoots<D, H>& b);
-private:
-    boost::array<Hash, Depth+1> empty_roots;
+
+    const size_t tree_depth;
+    std::vector<digest_variable<FieldT> > left_digests;
+    std::vector<digest_variable<FieldT> > right_digests;
+
+    gunero_merkle_authentication_path_variable(protoboard<FieldT> &pb,
+                                        const size_t tree_depth,
+                                        const std::string &annotation_prefix);
+
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness(const libff::bit_vector address, const gunero_merkle_authentication_path &path);
+    gunero_merkle_authentication_path get_authentication_path(const libff::bit_vector address) const;
 };
 
-template<size_t Depth, typename Hash>
-class GuneroMerkleTree {
+template<typename FieldT, typename HashT>
+class gunero_merkle_tree_check_read_gadget : public gadget<FieldT> {
+private:
 
-friend class GuneroWitness<Depth, Hash>;
+    std::vector<HashT> hashers;
+    std::vector<block_variable<FieldT> > hasher_inputs;
+    std::vector<digest_selector_gadget<FieldT> > propagators;
+    std::vector<digest_variable<FieldT> > internal_output;
+
+    std::shared_ptr<digest_variable<FieldT> > computed_root;
+    std::shared_ptr<bit_vector_copy_gadget<FieldT> > check_root;
 
 public:
-    BOOST_STATIC_ASSERT(Depth >= 1);
 
-    GuneroMerkleTree() { }
+    const size_t digest_size;
+    const size_t tree_depth;
+    pb_linear_combination_array<FieldT> address_bits;
+    digest_variable<FieldT> leaf;
+    digest_variable<FieldT> root;
+    gunero_merkle_authentication_path_variable<FieldT, HashT> path;
+    pb_linear_combination<FieldT> read_successful;
 
-    size_t DynamicMemoryUsage() const {
-        return 32 + // left
-               32 + // right
-               parents.size() * 32; // parents
-    }
+    gunero_merkle_tree_check_read_gadget(protoboard<FieldT> &pb,
+                                  const size_t tree_depth,
+                                  const pb_linear_combination_array<FieldT> &address_bits,
+                                  const digest_variable<FieldT> &leaf_digest,
+                                  const digest_variable<FieldT> &root_digest,
+                                  const gunero_merkle_authentication_path_variable<FieldT, HashT> &path,
+                                  const pb_linear_combination<FieldT> &read_successful,
+                                  const std::string &annotation_prefix);
 
-    size_t size() const;
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
 
-    void append(Hash obj);
-    Hash root() const {
-        return root(Depth, std::deque<Hash>());
-    }
-    Hash last() const;
-
-    GuneroWitness<Depth, Hash> witness() const {
-        return GuneroWitness<Depth, Hash>(*this);
-    }
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(left);
-        READWRITE(right);
-        READWRITE(parents);
-
-        wfcheck();
-    }
-
-    static Hash empty_root() {
-        return emptyroots.empty_root(Depth);
-    }
-
-    template <size_t D, typename H>
-    friend bool operator==(const GuneroMerkleTree<D, H>& a,
-                           const GuneroMerkleTree<D, H>& b);
-
-private:
-    static EmptyMerkleRoots<Depth, Hash> emptyroots;
-    boost::optional<Hash> left;
-    boost::optional<Hash> right;
-
-    // Collapsed "left" subtrees ordered toward the root of the tree.
-    std::vector<boost::optional<Hash>> parents;
-    GuneroMerklePath path(std::deque<Hash> filler_hashes = std::deque<Hash>()) const;
-    Hash root(size_t depth, std::deque<Hash> filler_hashes = std::deque<Hash>()) const;
-    bool is_complete(size_t depth = Depth) const;
-    size_t next_depth(size_t skip) const;
-    void wfcheck() const;
-};
-
-template <size_t Depth, typename Hash>
-class GuneroWitness {
-friend class GuneroMerkleTree<Depth, Hash>;
-
-public:
-    // Required for Unserialize()
-    GuneroWitness() {}
-
-    GuneroMerklePath path() const {
-        return tree.path(partial_path());
-    }
-
-    // Return the element being witnessed (should be a note
-    // commitment!)
-    Hash element() const {
-        return tree.last();
-    }
-
-    Hash root() const {
-        return tree.root(Depth, partial_path());
-    }
-
-    void append(Hash obj);
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(tree);
-        READWRITE(filled);
-        READWRITE(cursor);
-
-        cursor_depth = tree.next_depth(filled.size());
-    }
-
-    template <size_t D, typename H>
-    friend bool operator==(const GuneroWitness<D, H>& a,
-                           const GuneroWitness<D, H>& b);
-
-private:
-    GuneroMerkleTree<Depth, Hash> tree;
-    std::vector<Hash> filled;
-    boost::optional<GuneroMerkleTree<Depth, Hash>> cursor;
-    size_t cursor_depth = 0;
-    std::deque<Hash> partial_path() const;
-    GuneroWitness(GuneroMerkleTree<Depth, Hash> tree) : tree(tree) {}
+    static size_t root_size_in_bits();
+    /* for debugging purposes */
+    static size_t expected_constraints(const size_t tree_depth);
 };
 
 

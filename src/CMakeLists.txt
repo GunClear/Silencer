@@ -14,6 +14,7 @@ add_executable(
   main
 
   main.cpp
+  GuneroMerkleTree.cpp
   crypto/sha256.cpp
 )
 target_link_libraries(
