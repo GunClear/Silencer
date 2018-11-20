@@ -26,12 +26,12 @@ $ ../silencer generate --circuit=spend \
 ```bash
 $ echo [PICK RANDOM NUMBER] > ./firearm.rand
 $ echo [PICK RANDOM SERIAL] > ./firearm.serial
-$ ./gen-token.py \
+$ python gen-token.py \
         <(echo ./firearm.rand) \
         <(echo ./firearm.serial) \
         > ./token.hash
 $ echo [PICK RANDOM ACCOUNT] > ./previous.acct
-$ ./gen-txn-hash.py \
+$ python gen-txn-hash.py \
         <(echo ./previous.acct) \
         <(echo ./sender.key) \
         <(echo ./token.hash) \
@@ -42,7 +42,7 @@ $ ./gen-txn-hash.py \
 3. Generate authorization proof for both accounts
 ```bash
 $ echo [PICK RANDOM NUMBER] > ./sender-view.rand
-$ ./gen-view-hash.py \
+$ python gen-view-hash.py \
         <(echo ./sender.acct) \
         <(echo ./auth-root.hash) \
         <(echo ./sender-view.rand) \
@@ -61,7 +61,7 @@ Note: Repeat above steps for `receiver`
 
 4. Receiver generates transaction hash
 ```bash
-$ ./gen-txn-hash.py \
+$ python gen-txn-hash.py \
         <(echo ./sender.acct) \
         <(echo ./receiver.key) \
         <(echo ./token.hash) \
