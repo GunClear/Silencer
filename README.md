@@ -42,7 +42,7 @@ $ ./gen-txn-hash.py \
 3. Generate authorization proof for both accounts
 ```bash
 $ echo [PICK RANDOM NUMBER] > ./sender-view.rand
-$ ./gen-view.py \
+$ ./gen-view-hash.py \
         <(echo ./sender.acct) \
         <(echo ./auth-root.hash) \
         <(echo ./sender-view.rand) \
