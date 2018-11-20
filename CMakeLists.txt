@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 2.8)
 
 project(Silencer)
 
+option(
+  DEBUG
+  "Enable debugging mode"
+  ON
+)
+set(CMAKE_BUILD_TYPE Debug)
+if("${DEBUG}")
+  add_definitions(-DDEBUG -g)
+endif()
+
 set(
   CURVE
   "ALT_BN128"
@@ -44,12 +54,6 @@ option(
   ON
 )
 
-option(
-  DEBUG
-  "Enable debugging mode"
-  ON
-)
-
 if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   # Common compilation flags and warning configuration
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -Wfatal-errors -pthread")
@@ -72,12 +76,6 @@ endif()
 
 if("${VERBOSE}")
   add_definitions(-DVERBOSE=1)
-endif()
-
-set(CMAKE_BUILD_TYPE Debug)
-
-if("${DEBUG}")
-  add_definitions(-DDEBUG -g)
 endif()
 
 if("${MULTICORE}")
