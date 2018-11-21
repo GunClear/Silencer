@@ -27,15 +27,15 @@ $ ../silencer generate --circuit=spend \
 $ echo [PICK RANDOM NUMBER] > ./firearm.rand
 $ echo [PICK RANDOM SERIAL] > ./firearm.serial
 $ python gen-token.py \
-        <(echo ./firearm.rand) \
-        <(echo ./firearm.serial) \
+        $(cat ./firearm.rand) \
+        $(cat ./firearm.serial) \
         > ./token.hash
 $ echo [PICK RANDOM ACCOUNT] > ./previous.acct
 $ python gen-txn-hash.py \
-        <(echo ./previous.acct) \
-        <(echo ./sender.key) \
-        <(echo ./token.hash) \
-        <(echo ./auth-root.hash) \
+        $(cat ./previous.acct) \
+        $(cat ./sender.key) \
+        $(cat ./token.hash) \
+        $(cat ./auth-root.hash) \
         > ./previous-transaction.hash
 ```
 
@@ -43,9 +43,9 @@ $ python gen-txn-hash.py \
 ```bash
 $ echo [PICK RANDOM NUMBER] > ./sender-view.rand
 $ python gen-view-hash.py \
-        <(echo ./sender.acct) \
-        <(echo ./auth-root.hash) \
-        <(echo ./sender-view.rand) \
+        $(cat ./sender.acct) \
+        $(cat ./auth-root.hash) \
+        $(cat ./sender-view.rand) \
         > ./sender-view.hash
 $ ../silencer prove --circuit=authorization \
         --proving-key=./authorization-pk.json \
@@ -62,10 +62,10 @@ Note: Repeat above steps for `receiver`
 4. Receiver generates transaction hash
 ```bash
 $ python gen-txn-hash.py \
-        <(echo ./sender.acct) \
-        <(echo ./receiver.key) \
-        <(echo ./token.hash) \
-        <(echo ./auth-root.hash) \
+        $(cat ./sender.acct) \
+        $(cat ./receiver.key) \
+        $(cat ./token.hash) \
+        $(cat ./auth-root.hash) \
         > ./transaction.hash
 ```
 
