@@ -222,14 +222,6 @@ std::vector<bool> trailing252(std::vector<bool> input) {
     return std::vector<bool>(input.begin() + 4, input.end());
 }
 
-std::vector<bool> trailing160(std::vector<bool> input) {
-    if (input.size() != 256) {
-        throw std::length_error("trailing160 input invalid length");
-    }
-
-    return std::vector<bool>(input.begin() + 96, input.end());
-}
-
 std::vector<bool> uint252_to_bool_vector(uint252 input) {
     return trailing252(to_bool_vector(input));
 }
@@ -263,16 +255,6 @@ base_blob<BITS>::base_blob(const std::vector<unsigned char>& vch)
 {
     assert(vch.size() == sizeof(data));
     memcpy(data, &vch[0], sizeof(data));
-}
-
-template<typename FieldT>
-pb_variable_array<FieldT> gen256zeroes(pb_variable<FieldT>& ZERO) {
-    pb_variable_array<FieldT> ret;
-    while (ret.size() < 256) {
-        ret.emplace_back(ZERO);
-    }
-
-    return ret;
 }
 
 std::string strprintf(const char *fromat, ...)

@@ -32,6 +32,16 @@ using namespace libsnark;
 namespace gunero {
 
 template<typename FieldT>
+pb_variable_array<FieldT> gen256zeroes(pb_variable<FieldT>& ZERO) {
+    pb_variable_array<FieldT> ret;
+    while (ret.size() < 256) {
+        ret.emplace_back(ZERO);
+    }
+
+    return ret;
+}
+
+template<typename FieldT>
 class PRF_gadget : gadget<FieldT> {
 private:
     std::shared_ptr<block_variable<FieldT>> block;
