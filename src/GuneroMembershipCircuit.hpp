@@ -88,7 +88,7 @@ public:
         libff::print_header("Gunero prepare test variables");
         M_account = std::vector<gunero_merkle_authentication_node>(tree_depth);
 
-        libff::bit_vector s_proof_256(uint252_to_bool_vector_256_lpad(s_proof));
+        libff::bit_vector s_proof_256(uint252_to_bool_vector_256(s_proof));
         assert(s_proof_256.size() == HashT::get_digest_len());
 
         assert(N_account.size() == HashT::get_digest_len());

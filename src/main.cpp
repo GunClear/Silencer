@@ -196,13 +196,8 @@ std::vector<bool> uint160_to_bool_vector_256_rpad(uint160 input) {
     return input160;
 }
 
-std::vector<bool> uint252_to_bool_vector_256_lpad(uint252 input) {
-    std::vector<bool> input252 = to_bool_vector(input);
-
-    std::vector<bool> blob(256 - 252);
-    input252.insert(input252.begin(), blob.begin(), blob.end());
-
-    return input252;
+std::vector<bool> uint252_to_bool_vector_256(uint252 input) {
+    return to_bool_vector(input);
 }
 
 std::vector<bool> uint256_to_bool_vector(uint256 input) {
@@ -634,7 +629,7 @@ int main ()
 
             libff::bit_vector hash_1 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_1);
 
-            libff::bit_vector s_R_lsb = uint252_to_bool_vector_256_lpad(s_R);
+            libff::bit_vector s_R_lsb = uint252_to_bool_vector_256(s_R);
 
             libff::bit_vector block_2;
             block_2.insert(block_2.end(), s_R_lsb.begin(), s_R_lsb.end());
@@ -660,7 +655,7 @@ int main ()
         std::string GTRpkPath = "/home/sean/Silencer/build/src/GTR.pk.bin";
         std::string GTRvkPath = "/home/sean/Silencer/build/src/GTR.vk.bin";
 
-        std::string proofPath = "/home/sean/Silencer/build/src/GTR.proof.bin";
+        std::string GTRproofPath = "/home/sean/Silencer/build/src/GTR.proof.bin";
 
         //Generate Transaction Receive
         {
@@ -701,7 +696,7 @@ int main ()
 
             assert(proven);
 
-            saveToFile(proofPath, proof);
+            saveToFile(GTRproofPath, proof);
         }
 
         //Verify Transaction Receive
@@ -712,7 +707,7 @@ int main ()
             r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
 
             GuneroProof proof;
-            loadFromFile(proofPath, proof);
+            loadFromFile(GTRproofPath, proof);
 
             GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
 
