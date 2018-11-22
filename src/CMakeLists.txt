@@ -14,8 +14,10 @@ add_executable(
   main
 
   main.cpp
-  GuneroMerkleTree.cpp
-  crypto/sha256.cpp
+  GuneroProof.cpp
+  gunero_merkle_tree.cpp
+  gunero_merkle_tree_gadget.cpp
+  uint256.cpp
 )
 target_link_libraries(
   main

@@ -24,18 +24,8 @@
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 
-#include "zcash/uint256.h"
-#include "serialize.h"
-
-#include "zcash/Zcash.h"
 
 using namespace libsnark;
-// using namespace libzcash;
-
-// std::ostream& operator<<(std::ostream &out, const libff::bit_vector &a);
-// std::istream& operator>>(std::istream &in, libff::bit_vector &a);
-// std::ostream& operator<<(std::ostream &out, const std::vector<libff::bit_vector> &a);
-// std::istream& operator>>(std::istream &in, std::vector<libff::bit_vector> &a);
 
 namespace gunero {
 
