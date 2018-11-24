@@ -1,35 +1,3 @@
-#include <fstream>
-#include <mutex>
-
-//#include <libff/common/default_types/ec_pp.hpp> 
-#include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
-#include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
-#include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_examples.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/uscs_ppzksnark/uscs_ppzksnark.hpp>
-#include <libff/algebra/fields/field_utils.hpp>
-#include <libff/algebra/scalar_multiplication/multiexp.hpp>
-#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
-
-#ifndef ALT_BN128
-#define ALT_BN128
-#endif
-
-#ifdef ALT_BN128
-// #include <libff/algebra/curves/alt_bn128/alt_bn128_init.hpp>
-#include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
-#endif
-#include <libff/algebra/curves/edwards/edwards_pp.hpp>
-#include <libff/algebra/curves/mnt/mnt4/mnt4_pp.hpp>
-#include <libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp>
-#include <libff/common/utils.hpp>
-
-#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
-#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
-#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
-
 #include "uint256.h"
 #include "uint252.h"
 #include "util.h"
@@ -55,10 +23,8 @@ int main ()
 
     libff::start_profiling();
 
-#ifdef ALT_BN128
     //alt_bn128_pp
     libff::init_alt_bn128_params();
-#endif
 
     //Test SHA256
     if (TEST_SHA256)
@@ -107,41 +73,6 @@ int main ()
 
     //Make test
     {
-        // libff::bit_vector N_account_lsb(uint256_to_bool_vector(uint8_to_uint256(N_account)));
-
-        // uint256 PRF_addr_a_pk_one_calc;
-        // uint256 leaf_calc;
-        // {
-        //     libff::bit_vector PRF_addr_a_pk_one_lsb_calc;
-        //     {
-        //         libff::bit_vector one_lsb(252);
-        //         one_lsb.at(251) = true;
-
-        //         libff::bit_vector zero_lsb(256);
-
-        //         //1 1 0 0 + a_sk(252) + 0(256)
-        //         libff::bit_vector block(4);
-        //         block.at(0) = true;
-        //         block.at(1) = true;
-        //         block.insert(block.end(), one_lsb.begin(), one_lsb.end());
-        //         block.insert(block.end(), zero_lsb.begin(), zero_lsb.end());
-
-        //         PRF_addr_a_pk_one_lsb_calc = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
-
-        //         PRF_addr_a_pk_one_calc = bool_vector_to_uint256(PRF_addr_a_pk_one_lsb_calc);
-        //     }
-        //     {
-        //         //leaf = hash(P_proof,N_account)
-        //         libff::bit_vector block;
-        //         block.insert(block.end(), PRF_addr_a_pk_one_lsb_calc.begin(), PRF_addr_a_pk_one_lsb_calc.end());
-        //         block.insert(block.end(), N_account_lsb.begin(), N_account_lsb.end());
-
-        //         libff::bit_vector leaf_lsb_calc = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
-
-        //         leaf_calc = bool_vector_to_uint256(leaf_lsb_calc);
-        //     }
-        // }
-
         libff::bit_vector P_proof;//alt
         libff::bit_vector leaf;//alt
         libff::bit_vector W_lsb;

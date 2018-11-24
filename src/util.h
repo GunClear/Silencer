@@ -1,6 +1,8 @@
 #ifndef GUNERO_UTIL_H_
 #define GUNERO_UTIL_H_
 
+#include <fstream>
+
 #include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
 #include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_examples.hpp>
@@ -26,15 +28,6 @@
 #include "serialize.h"
 
 using namespace libsnark;
-
-template <unsigned int BITS>
-std::string base_blob<BITS>::GetHex() const
-{
-    char psz[sizeof(data) * 2 + 1];
-    for (unsigned int i = 0; i < sizeof(data); i++)
-        sprintf(psz + i * 2, "%02x", data[sizeof(data) - i - 1]);
-    return std::string(psz, psz + sizeof(data) * 2);
-}
 
 namespace gunero {
 
@@ -71,10 +64,6 @@ std::vector<bool> convertBytesVectorToBitVector(const std::vector<unsigned char>
 }
 std::vector<unsigned char> convertIntToVectorLE(const uint8_t val_int) {
     std::vector<unsigned char> bytes;
-
-    // for(size_t i = 0; i < 1; i++) {
-    //     bytes.push_back(val_int >> (i * 8));
-    // }
     bytes.push_back(val_int);
 
     return bytes;
@@ -148,10 +137,6 @@ uint160 bool_vector_left_to_uint160(std::vector<bool> input) {
 }
 
 uint256 bool_vector_to_uint256(std::vector<bool> input) {
-    //std::vector<unsigned char> input_v(input.begin(), input.end());
-
-    //return convertVectorToBytesVector(input_v);
-
     assert(input.size() == 256);
 
     std::vector<unsigned char> input_v = convertVectorToBytesVector(input);
@@ -174,14 +159,6 @@ uint160 uint8_to_uint160(uint8_t input) {
 
     return ret;
 }
-
-// uint252 uint8_to_uint252(uint8_t input) {
-//     uint252 ret;
-
-//     std::generate(ret.begin() + 31, ret.end(), [&]() { return input; });
-
-//     return ret;
-// }
 
 std::vector<bool> uint160_to_bool_vector_256_rpad(uint160 input) {
     std::vector<bool> input160 = to_bool_vector(input);
@@ -244,13 +221,6 @@ int div_ceil(int numerator, int denominator)
 {
     std::div_t res = std::div(numerator, denominator);
     return res.rem ? (res.quot + 1) : res.quot;
-}
-
-template <unsigned int BITS>
-base_blob<BITS>::base_blob(const std::vector<unsigned char>& vch)
-{
-    assert(vch.size() == sizeof(data));
-    memcpy(data, &vch[0], sizeof(data));
 }
 
 std::string strprintf(const char *fromat, ...)
