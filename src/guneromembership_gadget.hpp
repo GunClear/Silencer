@@ -24,84 +24,13 @@
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 
-#include "gunero_merkle_tree_gadget.hpp"
 #include "uint252.h"
+#include "gunero_merkle_tree_gadget.hpp"
+#include "gunero_alt_gadget.hpp"
 
 using namespace libsnark;
 
 namespace gunero {
-
-template<typename FieldT>
-pb_variable_array<FieldT> gen256zeroes(pb_variable<FieldT>& ZERO) {
-    pb_variable_array<FieldT> ret;
-    while (ret.size() < 256) {
-        ret.emplace_back(ZERO);
-    }
-
-    return ret;
-}
-
-template<typename FieldT>
-class PRF_gadget : gadget<FieldT> {
-private:
-    std::shared_ptr<block_variable<FieldT>> block;
-    std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher;
-    std::shared_ptr<digest_variable<FieldT>> result;
-
-public:
-    PRF_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        bool a,
-        bool b,
-        bool c,
-        bool d,
-        pb_variable_array<FieldT> x,
-        pb_variable_array<FieldT> y,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : gadget<FieldT>(pb), result(result) {
-
-        pb_linear_combination_array<FieldT> IV = SHA256_default_IV(pb);
-
-        pb_variable_array<FieldT> discriminants;
-        discriminants.emplace_back(a ? ONE : ZERO);
-        discriminants.emplace_back(b ? ONE : ZERO);
-        discriminants.emplace_back(c ? ONE : ZERO);
-        discriminants.emplace_back(d ? ONE : ZERO);
-
-        block.reset(new block_variable<FieldT>(pb, {
-            discriminants,
-            x,
-            y
-        }, "PRF_block"));
-
-        hasher.reset(new sha256_compression_function_gadget<FieldT>(
-            pb,
-            IV,
-            block->bits,
-            *result,
-        "PRF_hasher"));
-    }
-
-    void generate_r1cs_constraints() {
-        hasher->generate_r1cs_constraints();
-    }
-
-    void generate_r1cs_witness() {
-        hasher->generate_r1cs_witness();
-    }
-};
-
-template<typename FieldT>
-class PRF_addr_a_pk_gadget : public PRF_gadget<FieldT> {
-public:
-    PRF_addr_a_pk_gadget(
-        protoboard<FieldT>& pb,
-        pb_variable<FieldT>& ZERO,
-        pb_variable_array<FieldT>& a_sk,
-        std::shared_ptr<digest_variable<FieldT>> result
-    ) : PRF_gadget<FieldT>(pb, ZERO, 1, 1, 0, 0, a_sk, gen256zeroes(ZERO), result) {}
-};
 
 ///// MEMBERSHIP PROOF /////
 // Public Parameters:
@@ -111,16 +40,16 @@ public:
 
 // Private Parameters:
 // Account Secret Key (s_account)
-// alt: Proof Secret Key (s_proof)
 // alt: Account (A_account)
 // Authorization Merkle Path (M_account[160])
 // Account View Randomizer (r_account)
 
 //1) Obtain A_account from s_account through EDCSA (secp256k1) operations
-//1 alt) Obtain P_proof from s_proof through PRF operations
+//1 alt) Obtain P_proof from s_account through PRF operations
 //2) Validate W == calc_root(A_account, N_account, M_account[160]) (User is authorized)
 //2 alt) Validate W == calc_root(A_account, keccak256(P_proof,N_account), M_account[160]) (User is authorized)
 //3) Validate V_account == keccak256(A_account, keccak256(W,r_account) (View Hash is consistent)
+//3 alt) Validate V_account == keccak256(P_proof, keccak256(W,r_account) (View Hash is consistent)
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class guneromembership_gadget : public gadget<FieldT> {
 public:
@@ -134,14 +63,14 @@ public:
 
     // Aux inputs
     pb_variable<FieldT> ZERO;
-    std::shared_ptr<digest_variable<FieldT>> s_proof;
+    std::shared_ptr<digest_variable<FieldT>> s_account;
     std::shared_ptr<gunero_merkle_tree_gadget<FieldT, HashT, tree_depth>> gunero_merkle_tree;
     std::shared_ptr<digest_variable<FieldT>> r_account;
     std::shared_ptr<digest_variable<FieldT>> A_account;
 
     // Computed variables
     std::shared_ptr<digest_variable<FieldT>> P_proof;
-    std::shared_ptr<PRF_addr_a_pk_gadget<FieldT>> spend_authority;
+    std::shared_ptr<PRF_addr_a_pk_simple_gadget<FieldT>> spend_authority;
     std::shared_ptr<digest_variable<FieldT>> leaf_digest;
     std::shared_ptr<HashT> leaf_hasher;
     std::shared_ptr<digest_variable<FieldT>> view_hash_1_digest;
@@ -186,14 +115,15 @@ public:
         // to be one automatically for us, and is known as `ONE`.
         ZERO.allocate(pb);
 
-        s_proof.reset(new digest_variable<FieldT>(pb, 252, ""));
+        //We enforce 256 bits instead of 252 because of hash size compliance
+        s_account.reset(new digest_variable<FieldT>(pb, 256, ""));//252
 
         P_proof.reset(new digest_variable<FieldT>(pb, 256, ""));
 
-        spend_authority.reset(new PRF_addr_a_pk_gadget<FieldT>(
+        spend_authority.reset(new PRF_addr_a_pk_simple_gadget<FieldT>(
             pb,
             ZERO,
-            s_proof->bits,
+            s_account->bits,
             P_proof
         ));
 
@@ -228,7 +158,7 @@ public:
 
         view_hash_2_hasher.reset(new HashT(
             pb,
-            *A_account,
+            *P_proof,
             *view_hash_1_digest,
             *V_account,
             "view_hash_2_hasher"));
@@ -274,7 +204,7 @@ public:
         // Constrain `ZERO`
         generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
 
-        s_proof->generate_r1cs_constraints();
+        s_account->generate_r1cs_constraints();
 
         P_proof->generate_r1cs_constraints();
 
@@ -297,6 +227,7 @@ public:
 
         view_hash_2_hasher->generate_r1cs_constraints();
 
+        //Calculate constraints
         r1cs_constraint_system<FieldT> constraint_system = this->pb.get_constraint_system();
 
         if (r1csPath.length() > 0)
@@ -330,8 +261,8 @@ public:
     // Account View Hash (V_account)
 
     // Private Parameters:
-    // Account Secret Key (s_account)
-    // alt: Proof Secret Key (s_proof)
+    // alt X: Account Secret Key (s_account)
+    // alt: Proof Secret Key (s_account)
     // alt: Account (A_account)
     // Authorization Merkle Path (M_account[160])
     // Account View Randomizer (r_account)
@@ -339,7 +270,7 @@ public:
         const uint256& pW,
         const uint8_t pN_account,
         const uint256& pV_account,
-        const uint252& ps_proof,
+        const uint252& ps_account,
         const std::vector<gunero_merkle_authentication_node>& pM_account,
         const uint160& pA_account,
         const uint256& pr_account
@@ -366,13 +297,13 @@ public:
         // Witness `zero`
         this->pb.val(ZERO) = FieldT::zero();
 
-        // Witness s_proof for the input
-        s_proof->bits.fill_with_bits(
+        // Witness s_account for the input
+        s_account->bits.fill_with_bits(
             this->pb,
-            uint252_to_bool_vector(ps_proof)
+            uint252_to_bool_vector_256(ps_account)
         );
 
-        // Witness P_proof for s_proof with PRF_addr
+        // Witness P_proof for s_account with PRF_addr
         spend_authority->generate_r1cs_witness();
 
         // Witness hash(P_proof, N_account) = leaf_digest
@@ -409,7 +340,7 @@ public:
             uint160_to_bool_vector_256_rpad(pA_account)
         );
 
-        // Witness hash(A_account, view_hash_1_digest) = V_account
+        // Witness hash(P_proof, view_hash_1_digest) = V_account
         view_hash_2_hasher->generate_r1cs_witness();
 
         // [SANITY CHECK] Ensure that the intended root

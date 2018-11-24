@@ -42,16 +42,16 @@ namespace gunero {
 
 // Private Parameters:
 // Account Secret Key (s_account)
-// alt: Proof Secret Key (s_proof)
 // alt: Account (A_account)
 // Authorization Merkle Path (M_account[160])
 // Account View Randomizer (r_account)
 
 //1) Obtain A_account from s_account through EDCSA (secp256k1) operations
-//1 alt) Obtain P_proof from s_proof through PRF operations
+//1 alt) Obtain P_proof from s_account through PRF operations
 //2) Validate W == calc_root(A_account, N_account, M_account[160]) (User is authorized)
 //2 alt) Validate W == calc_root(A_account, keccak256(P_proof,N_account), M_account[160]) (User is authorized)
 //3) Validate V_account == keccak256(A_account, keccak256(W,r_account) (View Hash is consistent)
+//3) alt) Validate V_account == keccak256(P_proof, keccak256(W,r_account) (View Hash is consistent)
 template<typename FieldT, typename BaseT, typename HashT, size_t tree_depth>
 class GuneroMembershipCircuit
 {
@@ -72,9 +72,9 @@ public:
     }
 
     static void makeTestVariables(
-        const uint252& s_proof,
-        const libff::bit_vector& N_account,
-        const libff::bit_vector& r_account,
+        const uint252& s_account,
+        const uint8_t& N_account,
+        const uint256& r_account,
         libff::bit_vector& P_proof,
         libff::bit_vector& leaf,
         std::vector<gunero_merkle_authentication_node>& M_account,
@@ -88,20 +88,24 @@ public:
         libff::print_header("Gunero prepare test variables");
         M_account = std::vector<gunero_merkle_authentication_node>(tree_depth);
 
-        libff::bit_vector s_proof_256(uint252_to_bool_vector_256(s_proof));
-        assert(s_proof_256.size() == HashT::get_digest_len());
+        libff::bit_vector s_account_256(uint252_to_bool_vector_256(s_account));
+        assert(s_account_256.size() == HashT::get_digest_len());
 
-        assert(N_account.size() == HashT::get_digest_len());
-        {//P_proof = Hash(1100b | (s_proof&252b), 0)
+        libff::bit_vector N_account_lsb(uint256_to_bool_vector(uint8_to_uint256(N_account)));
+        assert(N_account_lsb.size() == HashT::get_digest_len());
+
+        {//P_proof = Hash(0000b | (s_account&252b), 0)
             libff::bit_vector block(HashT::get_digest_len());
-            block.insert(block.begin(), s_proof_256.begin(), s_proof_256.end());
-            block.at(0) = true;
-            block.at(1) = true;
+            block.insert(block.begin(), s_account_256.begin(), s_account_256.end());
+            assert(block.at(0) == false);
+            assert(block.at(1) == false);
+            assert(block.at(2) == false);
+            assert(block.at(3) == false);
 
             P_proof = HashT::get_hash(block);
 
             block = P_proof;
-            block.insert(block.end(), N_account.begin(), N_account.end());
+            block.insert(block.end(), N_account_lsb.begin(), N_account_lsb.end());
             leaf = HashT::get_hash(block);//hash(P_proof,N_account)
         }
 
@@ -145,16 +149,19 @@ public:
         A_account_padded.insert(A_account_padded.begin(), A_account.begin(), A_account.end());
 
         assert(A_account_padded.size() == HashT::get_digest_len());
-        assert(r_account.size() == HashT::get_digest_len());
-        {//view_hash_1 = hash(W, r_account)
-            libff::bit_vector block = W;
-            block.insert(block.end(), r_account.begin(), r_account.end());
-            view_hash_1 = HashT::get_hash(block);//hash(W, r_account)
 
-            //V_account = hash(A_account_padded, hash(W, r_account))
-            block = A_account_padded;
+        libff::bit_vector r_account_lsb(uint256_to_bool_vector(r_account));
+        assert(r_account_lsb.size() == HashT::get_digest_len());
+
+        {//view_hash_1 = hash(W, r_account_lsb)
+            libff::bit_vector block = W;
+            block.insert(block.end(), r_account_lsb.begin(), r_account_lsb.end());
+            view_hash_1 = HashT::get_hash(block);//hash(W, r_account_lsb)
+
+            //V_account = hash(P_proof, hash(W, r_account_lsb))
+            block = P_proof;
             block.insert(block.end(), view_hash_1.begin(), view_hash_1.end());
-            V_account = HashT::get_hash(block);//hash(A_account_padded, view_hash_1)
+            V_account = HashT::get_hash(block);//hash(P_proof, view_hash_1)
         }
 
         printf("\n"); libff::print_indent(); libff::print_mem("after prepare test variables"); libff::print_time("after prepare test variables");
@@ -164,7 +171,7 @@ public:
         const uint256& pW,
         const uint8_t& pN_account,
         const uint256& pV_account,
-        const uint252& ps_proof,
+        const uint252& ps_account,
         const std::vector<gunero_merkle_authentication_node>& pM_account,
         const uint160& pA_account,
         const uint256& pr_account,
@@ -189,7 +196,7 @@ public:
                         pW,
                         pN_account,
                         pV_account,
-                        ps_proof,
+                        ps_account,
                         pM_account,
                         pA_account,
                         pr_account

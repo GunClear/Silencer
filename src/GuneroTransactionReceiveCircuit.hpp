@@ -40,18 +40,23 @@ namespace gunero {
 // Current Transaction Hash (L)
 
 // Private Parameters:
-// Receiver Private Key (s_R)
+// Receiver Account Secret Key (s_R)
 // Receiver Account View Randomizer (r_R)
 // Sender Account Address (A_S)
 // Sender Account View Randomizer (r_S)
 // Firearm Serial Number (F)
 // Firearm View Randomizer (j)
+// alt: Receiver Account (A_R)
+// alt: Sender Proof Public Key (P_proof_S)
 
 //1) Obtain A_R from s_R through EDCSA operations
-//2) Validate V_S == hash(A_S + W + r_S) (View Hash is consistent for Sender)
-//3) Validate V_R == hash(A_R + W + r_R) (View Hash is consistent for Receiver)
-//4) Validate T == hash(F + j) (Both parties know the serial number)
-//5) Validate L == hash(A_S + s_R + T + W) (The send proof is consistent, not forged)
+//1 alt) Obtain P_proof_R from s_R through PRF operations
+//2) Validate V_S == hash(A_S, hash(W, r_S)) (View Hash is consistent for Sender)
+//2 alt) Validate V_S == hash(P_proof_S, hash(W, r_S)) (View Hash is consistent for Sender)
+//3) Validate V_R == hash(A_R, hash(W, r_R) (View Hash is consistent for Receiver)
+//3 alt) Validate V_R == hash(P_proof_R, hash(W, r_R)) (View Hash is consistent for Receiver)
+//4) Validate T == hash(F, j) (Both parties know the serial number)
+//5) Validate L == hash(A_S, hash(s_R, hash(T, W)) (The send proof is consistent, not forged)
 template<typename FieldT, typename BaseT, typename HashT>
 class GuneroTransactionReceiveCircuit
 {
@@ -83,6 +88,8 @@ public:
         const uint256& pr_S,
         const uint256& pF,
         const uint256& pj,
+        const uint160& pA_R,
+        const uint256& pP_proof_S,
         const r1cs_ppzksnark_proving_key<BaseT>& pk,
         const r1cs_ppzksnark_verification_key<BaseT>& vk,
         GuneroProof& proof
@@ -111,7 +118,9 @@ public:
                         pA_S,
                         pr_S,
                         pF,
-                        pj
+                        pj,
+                        pA_R,
+                        pP_proof_S
                     );
 
                     printf("\n"); libff::print_indent(); libff::print_mem("after gunerotransactionreceive_gadget.load_r1cs_constraints()"); libff::print_time("after gunerotransactionreceive_gadget.load_r1cs_constraints()");
