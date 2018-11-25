@@ -115,10 +115,10 @@ public:
 };
 
 /**
- * Gadget for the Keccak256 compression function.
+ * Gadget for the Keccak256 sponge function.
  */
 template<typename FieldT>
-class keccak256_compression_function_gadget : public gadget<FieldT> {
+class keccak256_sponge_function_gadget : public gadget<FieldT> {
 public:
     std::vector<pb_linear_combination_array<FieldT> > round_a;
     std::vector<pb_linear_combination_array<FieldT> > round_b;
@@ -141,7 +141,7 @@ public:
     pb_variable_array<FieldT> new_block;
     digest_variable<FieldT> output;
 
-    keccak256_compression_function_gadget(protoboard<FieldT> &pb,
+    keccak256_sponge_function_gadget(protoboard<FieldT> &pb,
                                        const pb_linear_combination_array<FieldT> &prev_output,
                                        const pb_variable_array<FieldT> &new_block,
                                        const digest_variable<FieldT> &output,
@@ -151,10 +151,10 @@ public:
 };
 
 /**
- * Gadget for the Keccak256 compression function, viewed as a 2-to-1 hash
+ * Gadget for the Keccak256 sponge function, viewed as a 2-to-1 hash
  * function, and using the pre-standardized SHA3 initialization vector but
  * otherwise the same as SHA3-256 variant specifications.
- * Note that for NULL input the compression returns
+ * Note that for NULL input the sponge returns
  * c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
  */
 template<typename FieldT>
@@ -163,7 +163,7 @@ public:
     typedef libff::bit_vector hash_value_type;
     //typedef merkle_authentication_path merkle_authentication_path_type;
 
-    std::shared_ptr<sha256_compression_function_gadget<FieldT> > f;
+    std::shared_ptr<keccak256_sponge_function_gadget<FieldT> > f;
 
     keccak256_two_to_one_hash_gadget(protoboard<FieldT> &pb,
                                   const digest_variable<FieldT> &left,
@@ -176,14 +176,11 @@ public:
                                   const digest_variable<FieldT> &output,
                                   const std::string &annotation_prefix);
 
-    //void generate_r1cs_constraints(const bool ensure_output_bitness=true); // ignored
     void generate_r1cs_witness();
 
     static size_t get_block_len();
     static size_t get_digest_len();
     static libff::bit_vector get_hash(const libff::bit_vector &input);
-
-    //static size_t expected_constraints(const bool ensure_output_bitness=true); // ignored
 };
 
 } // end namespace `gunero`
