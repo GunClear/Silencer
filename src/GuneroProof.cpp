@@ -1,7 +1,6 @@
 #include "GuneroProof.hpp"
 
 typedef libff::alt_bn128_pp BaseType;
-typedef libff::Fr<BaseType> FieldType;
 
 namespace gunero {
 
@@ -50,7 +49,7 @@ Fq::Fq(libsnark_Fq element) : data()
 template<>
 curve_Fq Fq::to_libsnark_fq() const
 {
-    auto element_bigint = read_bigint<4>(data);
+    libff::bigint<4> element_bigint = read_bigint<4>(data);
 
     // Check that the integer is smaller than the modulus
     auto modq = curve_Fq::field_char();
