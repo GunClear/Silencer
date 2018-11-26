@@ -1,5 +1,5 @@
-#ifndef GUNEROTRANSACTIONRECEIVE_GADGET_H_
-#define GUNEROTRANSACTIONRECEIVE_GADGET_H_
+#ifndef GUNEROTRANSACTIONSEND_GADGET_H_
+#define GUNEROTRANSACTIONSEND_GADGET_H_
 
 #include <deque>
 #include <boost/optional.hpp>
@@ -31,34 +31,35 @@ using namespace libsnark;
 
 namespace gunero {
 
-///// TRANSACTION RECEIVE PROOF /////
+///// TRANSACTION SEND PROOF /////
+// With this proof, we are validating that the sender of the token is accepting that this token's ownership should
+// be transferred to the new transaction hash given. The "account view hash" validates that this proof is consistent
+// with the others generated, and also serves as an additional precaution for others using this proof to validate an
+// unauthorized release of the token to a party not covered in the transaction.
 // Public Parameters:
-// Authorization Root Hash (W)
+// Current Authorization Root Hash (W)
 // Token UID (T)
 // Sender Account View Hash (V_S)
 // Receiver Account View Hash (V_R)
-// Current Transaction Hash (L)
+// Previous Transaction Hash (L_P)
 
 // Private Parameters:
-// Receiver Account Secret Key (s_R)
-// Receiver Account View Randomizer (r_R)
-// Sender Account Address (A_S)
+// Sender Private Key (s_S)
 // Sender Account View Randomizer (r_S)
-// Firearm Serial Number (F)
-// Firearm View Randomizer (j)
-// alt: Receiver Account (A_R)
-// alt: Sender Proof Public Key (P_proof_S)
+// Receiver Account View Randomizer (r_R)
+// Previous Sender Account Address (A_PS)
+// Previous Authorization Root Hash (W_P)
+// alt: Receiver Proof Public Key (P_proof_R)
 
-//1) Obtain A_R from s_R through EDCSA operations
-//1 alt) Obtain P_proof_R from s_R through PRF operations
+//1) Obtain A_S from s_S through EDCSA operations
+//1 alt) Obtain P_proof_S from s_S through PRF operations
 //2) Validate V_S == hash(A_S, hash(W, r_S)) (View Hash is consistent for Sender)
 //2 alt) Validate V_S == hash(P_proof_S, hash(W, r_S)) (View Hash is consistent for Sender)
-//3) Validate V_R == hash(A_R, hash(W, r_R) (View Hash is consistent for Receiver)
+//3) Validate V_R == hash(A_R, hash(W, r_R)) (View Hash is consistent for Receiver)
 //3 alt) Validate V_R == hash(P_proof_R, hash(W, r_R)) (View Hash is consistent for Receiver)
-//4) Validate T == hash(F, j) (Both parties know the serial number)
-//5) Validate L == hash(A_S, hash(s_R, hash(T, W)) (The send proof is consistent, not forged)
+//4) Validate L_P == hash(A_PS, hash(s_S, hash(T, W_P))) (The send proof is valid, sender owns token)
 template<typename FieldT, typename BaseT, typename HashT>
-class gunerotransactionreceive_gadget : public gadget<FieldT> {
+class gunerotransactionsend_gadget : public gadget<FieldT> {
 public:
     // Verifier inputs
     pb_variable_array<FieldT> zk_packed_inputs;
@@ -68,21 +69,19 @@ public:
     std::shared_ptr<digest_variable<FieldT>> T;
     std::shared_ptr<digest_variable<FieldT>> V_S;
     std::shared_ptr<digest_variable<FieldT>> V_R;
-    std::shared_ptr<digest_variable<FieldT>> L;
+    std::shared_ptr<digest_variable<FieldT>> L_P;
 
     // Aux inputs
     pb_variable<FieldT> ZERO;
-    std::shared_ptr<digest_variable<FieldT>> s_R;
-    std::shared_ptr<digest_variable<FieldT>> r_R;
-    std::shared_ptr<digest_variable<FieldT>> A_S;
+    std::shared_ptr<digest_variable<FieldT>> s_S;
     std::shared_ptr<digest_variable<FieldT>> r_S;
-    std::shared_ptr<digest_variable<FieldT>> F;
-    std::shared_ptr<digest_variable<FieldT>> j;
-    std::shared_ptr<digest_variable<FieldT>> A_R;//alt
-    std::shared_ptr<digest_variable<FieldT>> P_proof_S;//alt
+    std::shared_ptr<digest_variable<FieldT>> r_R;
+    std::shared_ptr<digest_variable<FieldT>> A_PS;
+    std::shared_ptr<digest_variable<FieldT>> W_P;
+    std::shared_ptr<digest_variable<FieldT>> P_proof_R;//alt
 
     // Computed variables
-    std::shared_ptr<digest_variable<FieldT>> P_proof_R;
+    std::shared_ptr<digest_variable<FieldT>> P_proof_S;
     std::shared_ptr<PRF_addr_a_pk_simple_gadget<FieldT>> spend_authority;
     std::shared_ptr<digest_variable<FieldT>> view_hash_1_digest;
     std::shared_ptr<HashT> view_hash_1_hasher;
@@ -90,14 +89,13 @@ public:
     std::shared_ptr<digest_variable<FieldT>> view_hash_2_digest;
     std::shared_ptr<HashT> view_hash_3_hasher;
     std::shared_ptr<HashT> view_hash_4_hasher;
-    std::shared_ptr<HashT> token_hasher;
     std::shared_ptr<digest_variable<FieldT>> transaction_hash_1_digest;
     std::shared_ptr<HashT> transaction_hash_1_hasher;
     std::shared_ptr<digest_variable<FieldT>> transaction_hash_2_digest;
     std::shared_ptr<HashT> transaction_hash_2_hasher;
     std::shared_ptr<HashT> transaction_hash_3_hasher;
 
-    gunerotransactionreceive_gadget(protoboard<FieldT>& pb)
+    gunerotransactionsend_gadget(protoboard<FieldT>& pb)
         : gadget<FieldT>(pb, "guneromembership_gadget")
     {
         // Verifier inputs
@@ -114,7 +112,7 @@ public:
             alloc_uint256(zk_unpacked_inputs, T);
             alloc_uint256(zk_unpacked_inputs, V_S);
             alloc_uint256(zk_unpacked_inputs, V_R);
-            alloc_uint256(zk_unpacked_inputs, L);
+            alloc_uint256(zk_unpacked_inputs, L_P);
 
             assert(zk_unpacked_inputs.size() == verifying_input_bit_size());
 
@@ -138,29 +136,25 @@ public:
         ZERO.allocate(pb);
 
         //We enforce 256 bits instead of 252 because of hash size compliance
-        s_R.reset(new digest_variable<FieldT>(pb, 256, ""));//252
-
-        r_R.reset(new digest_variable<FieldT>(pb, 256, ""));
-
-        A_S.reset(new digest_variable<FieldT>(pb, 256, ""));
+        s_S.reset(new digest_variable<FieldT>(pb, 256, ""));//252
 
         r_S.reset(new digest_variable<FieldT>(pb, 256, ""));
 
-        F.reset(new digest_variable<FieldT>(pb, 256, ""));
+        r_R.reset(new digest_variable<FieldT>(pb, 256, ""));
 
-        j.reset(new digest_variable<FieldT>(pb, 256, ""));
+        A_PS.reset(new digest_variable<FieldT>(pb, 256, ""));
 
-        A_R.reset(new digest_variable<FieldT>(pb, 256, ""));
-
-        P_proof_S.reset(new digest_variable<FieldT>(pb, 256, ""));
+        W_P.reset(new digest_variable<FieldT>(pb, 256, ""));
 
         P_proof_R.reset(new digest_variable<FieldT>(pb, 256, ""));
+
+        P_proof_S.reset(new digest_variable<FieldT>(pb, 256, ""));
 
         spend_authority.reset(new PRF_addr_a_pk_simple_gadget<FieldT>(
             pb,
             ZERO,
-            s_R->bits,
-            P_proof_R
+            s_S->bits,
+            P_proof_S
         ));
 
         //hash(P_proof_S, hash(W, r_S)) == V_S
@@ -197,21 +191,13 @@ public:
             *V_R,
             "view_hash_4_hasher"));
 
-        //T == hash(F, j)
-        token_hasher.reset(new HashT(
-            pb,
-            *F,
-            *j,
-            *T,
-            "token_hasher"));
-
-        //L == hash(A_S, hash(s_R, hash(T, W))
+        //hash(A_PS, hash(s_S, hash(T, W_P))) == L_P
         transaction_hash_1_digest.reset(new digest_variable<FieldT>(pb, 256, ""));
 
         transaction_hash_1_hasher.reset(new HashT(
             pb,
             *T,
-            *W,
+            *W_P,
             *transaction_hash_1_digest,
             "transaction_hash_1_hasher"));
 
@@ -219,20 +205,20 @@ public:
 
         transaction_hash_2_hasher.reset(new HashT(
             pb,
-            *s_R,
+            *s_S,
             *transaction_hash_1_digest,
             *transaction_hash_2_digest,
             "transaction_hash_2_hasher"));
 
         transaction_hash_3_hasher.reset(new HashT(
             pb,
-            *A_S,
+            *A_PS,
             *transaction_hash_2_digest,
-            *L,
+            *L_P,
             "transaction_hash_3_hasher"));
     }
 
-    ~gunerotransactionreceive_gadget()
+    ~gunerotransactionsend_gadget()
     {
 
     }
@@ -252,7 +238,7 @@ public:
         //V_R
         acc += HashT::get_digest_len();
 
-        //L
+        //L_P
         acc += HashT::get_digest_len();
 
         return acc;
@@ -277,23 +263,19 @@ public:
         // Constrain `ZERO`
         generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
 
-        s_R->generate_r1cs_constraints();
-
-        r_R->generate_r1cs_constraints();
-
-        A_S->generate_r1cs_constraints();
+        s_S->generate_r1cs_constraints();
 
         r_S->generate_r1cs_constraints();
 
-        F->generate_r1cs_constraints();
+        r_R->generate_r1cs_constraints();
 
-        j->generate_r1cs_constraints();
+        A_PS->generate_r1cs_constraints();
 
-        A_R->generate_r1cs_constraints();
-
-        P_proof_S->generate_r1cs_constraints();
+        W_P->generate_r1cs_constraints();
 
         P_proof_R->generate_r1cs_constraints();
+
+        P_proof_S->generate_r1cs_constraints();
 
         spend_authority->generate_r1cs_constraints();
 
@@ -308,8 +290,6 @@ public:
         view_hash_3_hasher->generate_r1cs_constraints();
 
         view_hash_4_hasher->generate_r1cs_constraints();
-
-        token_hasher->generate_r1cs_constraints();
 
         transaction_hash_1_digest->generate_r1cs_constraints();
 
@@ -350,34 +330,31 @@ public:
     }
 
     // Public Parameters:
-    // Authorization Root Hash (W)
+    // Current Authorization Root Hash (W)
     // Token UID (T)
     // Sender Account View Hash (V_S)
     // Receiver Account View Hash (V_R)
-    // Current Transaction Hash (L)
+    // Previous Transaction Hash (L_P)
 
     // Private Parameters:
-    // Receiver Private Key (s_R)
-    // Receiver Account View Randomizer (r_R)
-    // Sender Account Address (A_S)
+    // Sender Private Key (s_S)
     // Sender Account View Randomizer (r_S)
-    // Firearm Serial Number (F)
-    // Firearm View Randomizer (j)
-    // alt: Account (A_R)
+    // Receiver Account View Randomizer (r_R)
+    // Previous Sender Account Address (A_PS)
+    // Previous Authorization Root Hash (W_P)
+    // alt: Receiver Proof Public Key (P_proof_R)
     void generate_r1cs_witness(
         const uint256& pW,
         const uint256& pT,
         const uint256& pV_S,
         const uint256& pV_R,
-        const uint256& pL,
-        const uint252& ps_R,
-        const uint256& pr_R,
-        const uint160& pA_S,
+        const uint256& pL_P,
+        const uint252& ps_S,
         const uint256& pr_S,
-        const uint256& pF,
-        const uint256& pj,
-        const uint160& pA_R,
-        const uint256& pP_proof_S
+        const uint256& pr_R,
+        const uint160& pA_PS,
+        const uint256& pW_P,
+        const uint256& pP_proof_R
     )
     {
         // Witness W
@@ -386,7 +363,7 @@ public:
             uint256_to_bool_vector(pW)
         );
 
-        // Witness T. This is not a sanity check.
+        // Witness T
         T->bits.fill_with_bits(
             this->pb,
             uint256_to_bool_vector(pT)
@@ -405,34 +382,22 @@ public:
         );
 
         // Witness view hash. This is not a sanity check.
-        L->bits.fill_with_bits(
+        L_P->bits.fill_with_bits(
             this->pb,
-            uint256_to_bool_vector(pL)
+            uint256_to_bool_vector(pL_P)
         );
 
         // Witness `zero`
         this->pb.val(ZERO) = FieldT::zero();
 
-        // Witness s_R for the input
-        s_R->bits.fill_with_bits(
+        // Witness s_S for the input
+        s_S->bits.fill_with_bits(
             this->pb,
-            uint252_to_bool_vector_256(ps_R)
+            uint252_to_bool_vector_256(ps_S)
         );
 
-        // Witness P_proof_R for s_R with PRF_addr
+        // Witness P_proof_S for s_S with PRF_addr
         spend_authority->generate_r1cs_witness();
-
-        // Witness r_R for the input
-        r_R->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(pr_R)
-        );
-
-        // Witness A_S for the input
-        A_S->bits.fill_with_bits(
-            this->pb,
-            uint160_to_bool_vector_256_rpad(pA_S)
-        );
 
         // Witness r_S for the input
         r_S->bits.fill_with_bits(
@@ -440,28 +405,28 @@ public:
             uint256_to_bool_vector(pr_S)
         );
 
-        // Witness F for the input
-        F->bits.fill_with_bits(
+        // Witness r_R for the input
+        r_R->bits.fill_with_bits(
             this->pb,
-            uint256_to_bool_vector(pF)
+            uint256_to_bool_vector(pr_R)
         );
 
-        // Witness j for the input
-        j->bits.fill_with_bits(
+        // Witness A_PS for the input
+        A_PS->bits.fill_with_bits(
             this->pb,
-            uint256_to_bool_vector(pj)
+            uint160_to_bool_vector_256_rpad(pA_PS)
         );
 
-        // Witness A_R for the input
-        A_R->bits.fill_with_bits(
+        // Witness W_P for the input
+        W_P->bits.fill_with_bits(
             this->pb,
-            uint160_to_bool_vector_256_rpad(pA_R)
+            uint256_to_bool_vector(pW_P)
         );
 
-        // Witness P_proof_S for the input
-        P_proof_S->bits.fill_with_bits(
+        // Witness P_proof_R for the input
+        P_proof_R->bits.fill_with_bits(
             this->pb,
-            uint256_to_bool_vector(pP_proof_S)
+            uint256_to_bool_vector(pP_proof_R)
         );
 
         // Witness hash(W, r_S) = view_hash_1_digest
@@ -476,28 +441,14 @@ public:
         // Witness hash(P_proof_R, view_hash_2_digest) = V_R
         view_hash_4_hasher->generate_r1cs_witness();
 
-        // Witness hash(F, j) = T
-        token_hasher->generate_r1cs_witness();
-
-        // Witness //transaction_hash_1_digest = hash(T, W)
+        // Witness //transaction_hash_1_digest = hash(T, W_P)
         transaction_hash_1_hasher->generate_r1cs_witness();
 
-        // Witness //transaction_hash_2_digest = hash(s_R, transaction_hash_1_digest)
+        // Witness //transaction_hash_2_digest = hash(s_S, transaction_hash_1_digest)
         transaction_hash_2_hasher->generate_r1cs_witness();
 
-        // Witness //L == hash(A_S, transaction_hash_2_digest)
+        // Witness //L_P == hash(A_PS, transaction_hash_2_digest)
         transaction_hash_3_hasher->generate_r1cs_witness();
-
-        // [SANITY CHECK] Ensure that the intended root
-        // was witnessed by the inputs, even if the read
-        // gadget overwrote it. This allows the prover to
-        // fail instead of the verifier, in the event that
-        // the roots of the inputs do not match the
-        // hash provided to the proving hashers.
-        T->bits.fill_with_bits(
-            this->pb,
-            uint256_to_bool_vector(pT)
-        );
 
         // [SANITY CHECK] Ensure that the intended root
         // was witnessed by the inputs, even if the read
@@ -527,9 +478,9 @@ public:
         // fail instead of the verifier, in the event that
         // the roots of the inputs do not match the
         // hash provided to the proving hashers.
-        L->bits.fill_with_bits(
+        L_P->bits.fill_with_bits(
             this->pb,
-            uint256_to_bool_vector(pL)
+            uint256_to_bool_vector(pL_P)
         );
 
         // This happens last, because only by now are all the
@@ -542,7 +493,7 @@ public:
         const uint256& pT,
         const uint256& pV_S,
         const uint256& pV_R,
-        const uint256& pL
+        const uint256& pL_P
     ) {
         std::vector<bool> verify_inputs;
 
@@ -554,7 +505,7 @@ public:
 
         insert_uint256(verify_inputs, pV_R);
 
-        insert_uint256(verify_inputs, pL);
+        insert_uint256(verify_inputs, pL_P);
 
         assert(verify_inputs.size() == verifying_input_bit_size());
         auto verify_field_elements = libff::pack_bit_vector_into_field_element_vector<FieldT>(verify_inputs);
@@ -573,4 +524,4 @@ public:
 
 } // end namespace `gunero`
 
-#endif /* GUNEROTRANSACTIONRECEIVE_GADGET_H_ */
+#endif /* GUNEROTRANSACTIONSEND_GADGET_H_ */

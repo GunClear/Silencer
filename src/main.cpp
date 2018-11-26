@@ -5,6 +5,7 @@
 #include "keccak_gadget.hpp"
 #include "GuneroProof.hpp"
 #include "GuneroMembershipCircuit.hpp"
+#include "GuneroTransactionSendCircuit.hpp"
 #include "GuneroTransactionReceiveCircuit.hpp"
 
 using namespace libsnark;
@@ -12,12 +13,11 @@ using namespace gunero;
 
 int main ()
 {
-    const size_t MERKLE_TREE_DEPTH  = 160L;
+    const size_t MERKLE_TREE_DEPTH  = 160UL;
     const bool TEST_SHA256 = false;
     const bool EXECUTE_MEMBERSHIP = true;
-    const bool EXECUTE_TRANSACTION = true;
-    const bool FAKE_s_R_WITH_REAL_V_R = false;
-    const bool FAKE_r_S_WITH_REAL_V_S = false;
+    const bool EXECUTE_TRANSACTION_SEND = true;
+    const bool EXECUTE_TRANSACTION_RECEIVE = true;
 
     std::srand(std::time(NULL));
 
@@ -66,14 +66,16 @@ int main ()
     uint256 V_account;//set
 
     //Private Input variables
-    uint252 s_account = random_uint252();//alt
+    uint252 s_account = random_uint252();
     uint160 A_account;//set
     std::vector<gunero_merkle_authentication_node> M_account;//set
     uint256 r_account = random_uint256();
 
+    uint256 P_proof;//set
+
     //Make test
     {
-        libff::bit_vector P_proof;//alt
+        libff::bit_vector P_proof_lsb;//alt
         libff::bit_vector leaf;//alt
         libff::bit_vector W_lsb;
         libff::bit_vector view_hash_1_lsb;//alt
@@ -84,7 +86,7 @@ int main ()
             s_account,
             N_account,
             r_account,
-            P_proof,
+            P_proof_lsb,
             leaf,
             M_account,
             A_account_padded_lsb,
@@ -93,19 +95,13 @@ int main ()
             V_account_lsb
             );
 
-        // uint256 P_proof_msb = bool_vector_to_uint256(P_proof);
-
-        // assert(P_proof_msb == PRF_addr_a_pk_one_calc);
-
-        // uint256 leaf_msb = bool_vector_to_uint256(leaf);
-
-        // assert(leaf_msb == leaf_calc);
-
         A_account = bool_vector_left_to_uint160(A_account_padded_lsb);
 
         W = bool_vector_to_uint256(W_lsb);
 
         V_account = bool_vector_to_uint256(V_account_lsb);
+
+        P_proof = bool_vector_to_uint256(P_proof_lsb);
     }
 
     if (EXECUTE_MEMBERSHIP)
@@ -189,58 +185,60 @@ int main ()
         }
     }
 
-
-    ///// TRANSACTION RECEIVE PROOF /////
+    ///// TRANSACTION SEND PROOF /////
+    // With this proof, we are validating that the sender of the token is accepting that this token's ownership should
+    // be transferred to the new transaction hash given. The "account view hash" validates that this proof is consistent
+    // with the others generated, and also serves as an additional precaution for others using this proof to validate an
+    // unauthorized release of the token to a party not covered in the transaction.
     // Public Parameters:
-    // Authorization Root Hash (W)
+    // Current Authorization Root Hash (W)
     // Token UID (T)
     // Sender Account View Hash (V_S)
     // Receiver Account View Hash (V_R)
-    // Current Transaction Hash (L)
+    // Previous Transaction Hash (L_P)
 
     // Private Parameters:
-    // Receiver Account Secret Key (s_R)
-    // Receiver Account View Randomizer (r_R)
-    // Sender Account Address (A_S)
+    // Sender Private Key (s_S)
     // Sender Account View Randomizer (r_S)
-    // Firearm Serial Number (F)
-    // Firearm View Randomizer (j)
-    // alt: Receiver Account (A_R)
-    // alt: Sender Proof Public Key (P_proof_S)
+    // Receiver Account View Randomizer (r_R)
+    // Previous Sender Account Address (A_PS)
+    // Previous Authorization Root Hash (W_P)
+    // alt: Receiver Proof Public Key (P_proof_R)
 
-    //1) Obtain A_R from s_R through EDCSA operations
-    //1 alt) Obtain P_proof_R from s_R through PRF operations
-    //2) Validate V_S == hash(A_S + W + r_S) (View Hash is consistent for Sender)
-    //2 alt) Validate V_S == hash(P_proof_S + W + r_S) (View Hash is consistent for Sender)
-    //3) Validate V_R == hash(A_R + W + r_R) (View Hash is consistent for Receiver)
+    //1) Obtain A_S from s_S through EDCSA operations
+    //1 alt) Obtain P_proof_S from s_S through PRF operations
+    //2) Validate V_S == hash(A_S, hash(W, r_S)) (View Hash is consistent for Sender)
+    //2 alt) Validate V_S == hash(P_proof_S, hash(W, r_S)) (View Hash is consistent for Sender)
+    //3) Validate V_R == hash(A_R, hash(W, r_R)) (View Hash is consistent for Receiver)
     //3 alt) Validate V_R == hash(P_proof_R, hash(W, r_R)) (View Hash is consistent for Receiver)
-    //4) Validate T == hash(F + j) (Both parties know the serial number)
-    //5) Validate L == hash(A_S + s_R + T + W) (The send proof is consistent, not forged)
+    //4) Validate L_P == hash(A_PS, hash(s_S, hash(T, W_P))) (The send proof is valid, sender owns token)
 
     //Public Input variables
     // uint256 W = W;
     uint256 T;//set = hash(F, j)
     uint256 V_S;//set = hash(P_proof_S, hash(W, r_S))
-    uint256 V_R = V_account;
-    uint256 L;//set = hash(A_S, hash(s_R, hash(T, W)))
+    uint256 V_R = V_account;//hash(P_proof_R, hash(W, r_R)
+    uint256 L_P;//set = hash(A_PS, hash(s_S, hash(T, W_P)))
 
     //Private Input variables
-    uint252 s_R = s_account;
-    uint256 r_R = r_account;
-    uint160 A_S = random_uint160();
+    uint252 s_S = random_uint252();
     uint256 r_S = random_uint256();
+    uint256 r_R = r_account;
+    uint160 A_PS = random_uint160();
+    uint256 W_P = random_uint256();
+    uint256 P_proof_R = P_proof;
+
+    //Storage variables
     uint256 F = random_uint256();
     uint256 j = random_uint256();
+    uint256 L;//set = hash(A_S, hash(s_R, hash(T, W)))
+    uint256 P_proof_S;//set = PRF(s_S)
     uint160 A_R = A_account;//Alt
-    uint256 P_proof_S = random_uint256();//Alt
+    uint252 s_R = s_account;
+    uint160 A_S = random_uint160();
 
     //Make test
     {
-        if (FAKE_s_R_WITH_REAL_V_R)
-        {
-            s_R = random_uint252();
-        }
-
         {//T = hash(F, j)
             libff::bit_vector F_lsb = uint256_to_bool_vector(F);
             libff::bit_vector j_lsb = uint256_to_bool_vector(j);
@@ -252,6 +250,16 @@ int main ()
             libff::bit_vector T_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
 
             T = bool_vector_to_uint256(T_lsb);
+        }
+        {//P_proof_S = PRF(s_S)
+            libff::bit_vector s_S_lsb = uint252_to_bool_vector_256(s_S);
+
+            libff::bit_vector block(sha256_two_to_one_hash_gadget<FieldType>::get_digest_len());
+            block.insert(block.begin(), s_S_lsb.begin(), s_S_lsb.end());
+
+            libff::bit_vector P_proof_S_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
+
+            P_proof_S = bool_vector_to_uint256(P_proof_S_lsb);
         }
         {//V_S = hash(P_proof_S, hash(W, r_S))
             libff::bit_vector W_lsb = uint256_to_bool_vector(W);
@@ -272,6 +280,34 @@ int main ()
             libff::bit_vector V_S_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_2);
 
             V_S = bool_vector_to_uint256(V_S_lsb);
+        }
+        {//L_P = hash(A_PS, hash(s_S, hash(T, W_P)))
+            libff::bit_vector T_lsb = uint256_to_bool_vector(T);
+            libff::bit_vector W_P_lsb = uint256_to_bool_vector(W_P);
+
+            libff::bit_vector block_1;
+            block_1.insert(block_1.end(), T_lsb.begin(), T_lsb.end());
+            block_1.insert(block_1.end(), W_P_lsb.begin(), W_P_lsb.end());
+
+            libff::bit_vector hash_1 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_1);
+
+            libff::bit_vector s_S_lsb = uint252_to_bool_vector_256(s_S);
+
+            libff::bit_vector block_2;
+            block_2.insert(block_2.end(), s_S_lsb.begin(), s_S_lsb.end());
+            block_2.insert(block_2.end(), hash_1.begin(), hash_1.end());
+
+            libff::bit_vector hash_2 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_2);
+
+            libff::bit_vector A_PS_lsb = uint160_to_bool_vector_256_rpad(A_PS);
+
+            libff::bit_vector block_3;
+            block_3.insert(block_3.end(), A_PS_lsb.begin(), A_PS_lsb.end());
+            block_3.insert(block_3.end(), hash_2.begin(), hash_2.end());
+
+            libff::bit_vector L_P_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_3);
+
+            L_P = bool_vector_to_uint256(L_P_lsb);
         }
         {//L = hash(A_S, hash(s_R, hash(T, W)))
             libff::bit_vector T_lsb = uint256_to_bool_vector(T);
@@ -301,14 +337,124 @@ int main ()
 
             L = bool_vector_to_uint256(L_lsb);
         }
+    }
 
-        if (FAKE_r_S_WITH_REAL_V_S)
+    if (EXECUTE_TRANSACTION_SEND)
+    {
+        std::string GTSr1csPath = "/home/sean/Silencer/build/src/GTS.r1cs.bin";
+        std::string GTSpkPath = "/home/sean/Silencer/build/src/GTS.pk.bin";
+        std::string GTSvkPath = "/home/sean/Silencer/build/src/GTS.vk.bin";
+
+        std::string GTSproofPath = "/home/sean/Silencer/build/src/GTS.proof.bin";
+
+        //Generate Transaction Send
         {
-            r_S = random_uint256();
+            /* generate circuit */
+            libff::print_header("Gunero Generator");
+
+            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+
+            gtsc.generate(GTSr1csPath, GTSpkPath, GTSvkPath);
+        }
+
+        //Prove Transaction Receive
+        {
+            r1cs_ppzksnark_proving_key<BaseType> pk;
+            loadFromFile(GTSpkPath, pk);
+
+            r1cs_ppzksnark_verification_key<BaseType> vk;
+            loadFromFile(GTSvkPath, vk);
+
+            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+
+            GuneroProof proof;
+            bool proven = gtsc.prove(
+                W,
+                T,
+                V_S,
+                V_R,
+                L_P,
+                s_S,
+                r_S,
+                r_R,
+                A_PS,
+                W_P,
+                P_proof_R,
+                pk,
+                vk,
+                proof);
+
+            assert(proven);
+
+            saveToFile(GTSproofPath, proof);
+        }
+
+        //Verify Transaction Send
+        {
+            r1cs_ppzksnark_verification_key<BaseType> vk;
+            loadFromFile(GTSvkPath, vk);
+
+            r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
+
+            GuneroProof proof;
+            loadFromFile(GTSproofPath, proof);
+
+            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+
+            bool verified = gtsc.verify(
+                W,
+                T,
+                V_S,
+                V_R,
+                L_P,
+                proof,
+                vk,
+                vk_precomp);
+
+            assert(verified);
+
+            printf("verified: ");
+            if (verified)
+            {
+                printf("true");
+            }
+            else
+            {
+                printf("false");
+            }
+            printf("\n");
         }
     }
 
-    if (EXECUTE_TRANSACTION)
+
+    ///// TRANSACTION RECEIVE PROOF /////
+    // Public Parameters:
+    // Authorization Root Hash (W)
+    // Token UID (T)
+    // Sender Account View Hash (V_S)
+    // Receiver Account View Hash (V_R)
+    // Current Transaction Hash (L)
+
+    // Private Parameters:
+    // Receiver Account Secret Key (s_R)
+    // Receiver Account View Randomizer (r_R)
+    // Sender Account Address (A_S)
+    // Sender Account View Randomizer (r_S)
+    // Firearm Serial Number (F)
+    // Firearm View Randomizer (j)
+    // alt: Receiver Account (A_R)
+    // alt: Sender Proof Public Key (P_proof_S)
+
+    //1) Obtain A_R from s_R through EDCSA operations
+    //1 alt) Obtain P_proof_R from s_R through PRF operations
+    //2) Validate V_S == hash(A_S + W + r_S) (View Hash is consistent for Sender)
+    //2 alt) Validate V_S == hash(P_proof_S + W + r_S) (View Hash is consistent for Sender)
+    //3) Validate V_R == hash(A_R + W + r_R) (View Hash is consistent for Receiver)
+    //3 alt) Validate V_R == hash(P_proof_R, hash(W, r_R)) (View Hash is consistent for Receiver)
+    //4) Validate T == hash(F + j) (Both parties know the serial number)
+    //5) Validate L == hash(A_S + s_R + T + W) (The send proof is consistent, not forged)
+
+    if (EXECUTE_TRANSACTION_RECEIVE)
     {
         std::string GTRr1csPath = "/home/sean/Silencer/build/src/GTR.r1cs.bin";
         std::string GTRpkPath = "/home/sean/Silencer/build/src/GTR.pk.bin";
