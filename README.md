@@ -7,14 +7,15 @@ Zero-Knowledge Proof lib for Gunero
 
 ## Installation
 ```bash
-$ mkdir build
 $ cd depends
 $ git submodule init
 $ git submodule update
 $ cd libsnark/depends
 $ git submodule init
 $ git submodule update
-$ cd ../../../build
+$ cd ../../../
+$ mkdir build
+# cd build
 $ cmake ..
 $ make
 ```
