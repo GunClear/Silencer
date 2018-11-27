@@ -5,12 +5,8 @@ project(Silencer)
 option(
   DEBUG
   "Enable debugging mode"
-  ON
+  OFF
 )
-set(CMAKE_BUILD_TYPE Debug)
-if("${DEBUG}")
-  add_definitions(-DDEBUG -g)
-endif()
 
 set(
   CURVE
@@ -39,7 +35,7 @@ set(
 option(
   MULTICORE
   "Enable parallelized execution, using OpenMP"
-  OFF
+  ON
 )
 
 option(

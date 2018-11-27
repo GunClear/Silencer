@@ -156,4 +156,16 @@ $ ../silencer verify --circuit=authorization \
         --account-view-hash=./sender-view.hash \
         --proof=./receiver-auth.proof
 FAIL!
+=======
+```bash
+$ mkdir build
+$ cd depends
+$ git submodule init
+$ git submodule update
+$ cd libsnark/depends
+$ git submodule init
+$ git submodule update
+$ cd ../../../build
+$ cmake ..
+$ make
 ```

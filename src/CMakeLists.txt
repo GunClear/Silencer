@@ -1,5 +1,3 @@
-set(CMAKE_BUILD_TYPE Debug)
-
 SET(GCC_COVERAGE_COMPILE_FLAGS "-fpermissive")
 
 set(CMAKE_CXX_STANDARD 14)
@@ -14,7 +12,10 @@ add_executable(
   main
 
   main.cpp
-  crypto/sha256.cpp
+  GuneroProof.cpp
+  gunero_merkle_tree.cpp
+  gunero_merkle_tree_gadget.cpp
+  uint256.cpp
 )
 target_link_libraries(
   main
