@@ -45,6 +45,11 @@ namespace gunero {
 typedef libff::bit_vector gunero_merkle_authentication_node;
 typedef std::vector<gunero_merkle_authentication_node> gunero_merkle_authentication_path;
 
+std::ostream& operator<<(std::ostream &out, const gunero_merkle_authentication_node& node);
+std::istream& operator>>(std::istream &in, gunero_merkle_authentication_node& node);
+std::ostream& operator<<(std::ostream &out, const std::vector<gunero_merkle_authentication_node>& M_account);
+std::istream& operator>>(std::istream &in, std::vector<gunero_merkle_authentication_node>& M_account);
+
 template<typename HashT>
 class gunero_merkle_tree {
 private:

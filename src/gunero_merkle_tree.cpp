@@ -2,6 +2,62 @@
 
 namespace gunero {
 
+std::ostream& operator<<(std::ostream &out, const gunero_merkle_authentication_node& node)
+{
+    out << node.size();
+    for(size_t i = 0; i < node.size(); i++)
+    {
+        out << (uint8_t)(node[i] ? (uint8_t)1 : (uint8_t)0);
+    }
+
+    return out;
+}
+
+std::istream& operator>>(std::istream &in, gunero_merkle_authentication_node& node)
+{
+    node.clear();
+
+    size_t size;
+    in >> size;
+
+    uint8_t element;
+    for(size_t i = 0; i < size; i++)
+    {
+        in >> element;
+        node.insert(node.end(), (bool)(element ? true : false));
+    }
+
+    return in;
+}
+
+std::ostream& operator<<(std::ostream &out, const std::vector<gunero_merkle_authentication_node>& M_account)
+{
+    out << M_account.size();
+    for(size_t i = 0; i < M_account.size(); i++)
+    {
+        out << M_account[i];
+    }
+
+    return out;
+}
+
+std::istream& operator>>(std::istream &in, std::vector<gunero_merkle_authentication_node>& M_account)
+{
+    M_account.clear();
+
+    size_t size;
+    in >> size;
+
+    gunero_merkle_authentication_node node;
+    for(size_t i = 0; i < size; i++)
+    {
+        in >> node;
+        M_account.insert(M_account.end(), node);
+    }
+
+    return in;
+}
+
 template<typename FieldT, typename HashT>
 gunero_merkle_authentication_path gunero_merkle_authentication_path_variable<FieldT, HashT>::get_authentication_path(const libff::bit_vector address) const
 {
