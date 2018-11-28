@@ -9,21 +9,23 @@ add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
 include_directories(.)
 
 add_executable(
-  main
+  silencer
 
+  util.cpp
   main.cpp
   GuneroProof.cpp
   gunero_merkle_tree.cpp
   gunero_merkle_tree_gadget.cpp
+  keccak_gadget.cpp
   uint256.cpp
 )
 target_link_libraries(
-  main
+  silencer
 
   snark
 )
 target_include_directories(
-  main
+  silencer
 
   PUBLIC
   ${DEPENDS_DIR}/libsnark

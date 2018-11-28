@@ -34,6 +34,48 @@ using namespace libsnark;
 
 namespace gunero {
 
+class GuneroMembershipWitness{
+public:
+    uint256 W;
+    uint8_t N_account;
+    uint256 V_account;
+
+    GuneroMembershipWitness() {}
+    GuneroMembershipWitness(
+        const uint256& pW,
+        const uint8_t& pN_account,
+        const uint256& pV_account
+    ) : W(pW),
+        N_account(pN_account),
+        V_account(pV_account)
+    {
+    }
+    ~GuneroMembershipWitness() {}
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(W);
+        READWRITE(N_account);
+        READWRITE(V_account);
+    }
+
+    friend std::ostream& operator<<(std::ostream &out, const GuneroMembershipWitness &witness)
+    {
+        ::Serialize(out, witness, 1, 1);
+
+        return out;
+    }
+
+    friend std::istream& operator>>(std::istream &in, GuneroMembershipWitness &witness)
+    {
+        ::Unserialize(in, witness, 1, 1);
+
+        return in;
+    }
+};
+
 ///// MEMBERSHIP PROOF /////
 // Public Parameters:
 // Authorization Root Hash (W)
@@ -85,7 +127,9 @@ public:
     )
     {
         /* prepare test variables */
+#if DEBUG
         libff::print_header("Gunero prepare test variables");
+#endif
         M_account = std::vector<gunero_merkle_authentication_node>(tree_depth);
 
         libff::bit_vector s_account_256(uint252_to_bool_vector_256(s_account));
@@ -164,7 +208,9 @@ public:
             V_account = HashT::get_hash(block);//hash(P_proof, view_hash_1)
         }
 
+#if DEBUG
         printf("\n"); libff::print_indent(); libff::print_mem("after prepare test variables"); libff::print_time("after prepare test variables");
+#endif
     }
 
     bool prove(
@@ -180,7 +226,9 @@ public:
         GuneroProof& proof
     )
     {
+#if DEBUG
         libff::print_header("Gunero witness (proof)");
+#endif
 
         {
             r1cs_primary_input<FieldT> primary_input;
@@ -188,7 +236,9 @@ public:
             {
                 protoboard<FieldT> pb;
                 {
+#if DEBUG
                     libff::print_header("Gunero guneromembership_gadget.load_r1cs_constraints()");
+#endif
 
                     guneromembership_gadget<FieldT, BaseT, HashT, tree_depth> gunero(pb);
 
@@ -202,7 +252,9 @@ public:
                         pr_account
                     );
 
+#if DEBUG
                     printf("\n"); libff::print_indent(); libff::print_mem("after guneromembership_gadget.load_r1cs_constraints()"); libff::print_time("after guneromembership_gadget.load_r1cs_constraints()");
+#endif
                 }
 
                 // The constraint system must be satisfied or there is an unimplemented
@@ -238,7 +290,9 @@ public:
 
             proof = GuneroProof(r1cs_proof);
 
+#if DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
+#endif
         }
 
         //Verify
@@ -281,7 +335,9 @@ public:
                 r1cs_proof
             );
 
+#if DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
+#endif
 
             if (verified)
             {

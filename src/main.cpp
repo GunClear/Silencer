@@ -11,7 +11,243 @@
 using namespace libsnark;
 using namespace gunero;
 
-int main ()
+//Verify Membership
+extern "C" int verify_membership(
+    const char* WHex,
+    uint8_t N_account,
+    const char* V_accountHex,
+    const char* vkPath,
+    const char* proofPath
+    );
+
+//Verify Transaction Send
+extern "C" int verify_send(
+    const char* WHex,
+    const char* THex,
+    const char* V_SHex,
+    const char* V_RHex,
+    const char* L_PHex,
+    const char* vkPath,
+    const char* proofPath
+    );
+
+//Full test
+extern "C" int full_test();
+
+void show_command_line()
+{
+    printf("\nusage: silencer [option]\n");
+}
+
+int main(int argc, const char* argv[])
+{
+    if (argc <= 1)
+    {
+        show_command_line();
+        return -1;
+    }
+
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
+    //full_test
+    if (std::string(argv[1]) == "1")
+    {
+        printf("\nfull_test\n");
+
+        return full_test();
+    }
+
+    //verify_membership
+    if (std::string(argv[1]) == "2")
+    {
+        printf("\nverify_membership\n");
+
+        std::string GTMvkPath = "/home/sean/Silencer/build/src/GTM.vk.bin";
+        std::string GTMwitnessPath = "/home/sean/Silencer/build/src/GTM.witness.bin";
+        std::string GTMproofPath = "/home/sean/Silencer/build/src/GTM.proof.bin";
+
+        GuneroMembershipWitness gmw;
+        loadFromFile(GTMwitnessPath, gmw);
+
+        std::string WHex = gmw.W.GetHex();
+        std::string V_accountHex = gmw.V_account.GetHex();
+
+        int ret = verify_membership(
+            WHex.c_str(),
+            gmw.N_account,
+            V_accountHex.c_str(),
+            GTMvkPath.c_str(),
+            GTMproofPath.c_str()
+        );
+
+        printf("verified: ");
+        if (ret)
+        {
+            printf("false");
+        }
+        else
+        {
+            printf("true");
+        }
+        printf("\n");
+
+        return ret;
+    }
+
+    //verify_send
+    if (std::string(argv[1]) == "3")
+    {
+        printf("\nverify_send\n");
+
+        std::string GTSvkPath = "/home/sean/Silencer/build/src/GTS.vk.bin";
+        std::string GTSwitnessPath = "/home/sean/Silencer/build/src/GTS.witness.bin";
+        std::string GTSproofPath = "/home/sean/Silencer/build/src/GTS.proof.bin";
+
+        GuneroTransactionSendWitness gtsw;
+        loadFromFile(GTSwitnessPath, gtsw);
+
+        std::string WHex = gtsw.W.GetHex();
+        std::string THex = gtsw.T.GetHex();
+        std::string V_SHex = gtsw.V_S.GetHex();
+        std::string V_RHex = gtsw.V_R.GetHex();
+        std::string L_PHex = gtsw.L_P.GetHex();
+
+        int ret = verify_send(
+            WHex.c_str(),
+            THex.c_str(),
+            V_SHex.c_str(),
+            V_RHex.c_str(),
+            L_PHex.c_str(),
+            GTSvkPath.c_str(),
+            GTSproofPath.c_str()
+        );
+
+        printf("verified: ");
+        if (ret)
+        {
+            printf("false");
+        }
+        else
+        {
+            printf("true");
+        }
+        printf("\n");
+
+        return ret;
+    }
+
+    show_command_line();
+    return -1;
+}
+
+//Verify Membership
+extern "C" int verify_membership(
+    const char* WHex,
+    uint8_t N_account,
+    const char* V_accountHex,
+    const char* vkPath,
+    const char* proofPath
+    )
+{
+    const size_t MERKLE_TREE_DEPTH  = 160UL;
+
+    uint256 W;
+    W.SetHex(WHex);
+
+    uint256 V_account;
+    V_account.SetHex(V_accountHex);
+
+    r1cs_ppzksnark_verification_key<BaseType> vk;
+    loadFromFile(vkPath, vk);
+
+    r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
+
+    GuneroProof proof;
+    loadFromFile(proofPath, proof);
+
+    GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
+
+    bool verified = gmc.verify(
+        W,
+        N_account,
+        V_account,
+        proof,
+        vk,
+        vk_precomp);
+
+    if (verified)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+//Verify Transaction Send
+extern "C" int verify_send(
+    const char* WHex,
+    const char* THex,
+    const char* V_SHex,
+    const char* V_RHex,
+    const char* L_PHex,
+    const char* vkPath,
+    const char* proofPath
+    )
+{
+    const size_t MERKLE_TREE_DEPTH  = 160UL;
+
+    uint256 W;
+    W.SetHex(WHex);
+
+    uint256 T;
+    T.SetHex(THex);
+
+    uint256 V_S;
+    V_S.SetHex(V_SHex);
+
+    uint256 V_R;
+    V_R.SetHex(V_RHex);
+
+    uint256 L_P;
+    L_P.SetHex(L_PHex);
+
+    r1cs_ppzksnark_verification_key<BaseType> vk;
+    loadFromFile(vkPath, vk);
+
+    r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
+
+    GuneroProof proof;
+    loadFromFile(proofPath, proof);
+
+    GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+
+    bool verified = gtsc.verify(
+        W,
+        T,
+        V_S,
+        V_R,
+        L_P,
+        proof,
+        vk,
+        vk_precomp);
+
+    if (verified)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+
+extern "C" int full_test()
 {
     const size_t MERKLE_TREE_DEPTH  = 160UL;
     const bool TEST_SHA256 = false;
@@ -22,9 +258,6 @@ int main ()
     std::srand(std::time(NULL));
 
     libff::start_profiling();
-
-    //alt_bn128_pp
-    libff::init_alt_bn128_params();
 
     //Test SHA256
     if (TEST_SHA256)
@@ -106,29 +339,31 @@ int main ()
 
     if (EXECUTE_MEMBERSHIP)
     {
-        std::string r1csPath = "/home/sean/Silencer/build/src/r1cs.bin";
-        std::string pkPath = "/home/sean/Silencer/build/src/pk.bin";
-        std::string vkPath = "/home/sean/Silencer/build/src/vk.bin";
-
-        std::string proofPath = "/home/sean/Silencer/build/src/proof.bin";
+        std::string GTMr1csPath = "/home/sean/Silencer/build/src/GTM.r1cs.bin";
+        std::string GTMpkPath = "/home/sean/Silencer/build/src/GTM.pk.bin";
+        std::string GTMvkPath = "/home/sean/Silencer/build/src/GTM.vk.bin";
+        std::string GTMwitnessPath = "/home/sean/Silencer/build/src/GTM.witness.bin";
+        std::string GTMproofPath = "/home/sean/Silencer/build/src/GTM.proof.bin";
 
         //Generate Membership
         {
             /* generate circuit */
+#if DEBUG
             libff::print_header("Gunero Generator");
+#endif
 
             GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
-            gmc.generate(r1csPath, pkPath, vkPath);
+            gmc.generate(GTMr1csPath, GTMpkPath, GTMvkPath);
         }
 
         //Prove Membership
         {
             r1cs_ppzksnark_proving_key<BaseType> pk;
-            loadFromFile(pkPath, pk);
+            loadFromFile(GTMpkPath, pk);
 
             r1cs_ppzksnark_verification_key<BaseType> vk;
-            loadFromFile(vkPath, vk);
+            loadFromFile(GTMvkPath, vk);
 
             GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
@@ -147,18 +382,24 @@ int main ()
 
             assert(proven);
 
-            saveToFile(proofPath, proof);
+            saveToFile(GTMproofPath, proof);
+
+            GuneroMembershipWitness gmw(
+                W,
+                N_account,
+                V_account);
+            saveToFile(GTMwitnessPath, gmw);
         }
 
         //Verify Membership
         {
             r1cs_ppzksnark_verification_key<BaseType> vk;
-            loadFromFile(vkPath, vk);
+            loadFromFile(GTMvkPath, vk);
 
             r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
 
             GuneroProof proof;
-            loadFromFile(proofPath, proof);
+            loadFromFile(GTMproofPath, proof);
 
             GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
@@ -344,13 +585,15 @@ int main ()
         std::string GTSr1csPath = "/home/sean/Silencer/build/src/GTS.r1cs.bin";
         std::string GTSpkPath = "/home/sean/Silencer/build/src/GTS.pk.bin";
         std::string GTSvkPath = "/home/sean/Silencer/build/src/GTS.vk.bin";
-
+        std::string GTSwitnessPath = "/home/sean/Silencer/build/src/GTS.witness.bin";
         std::string GTSproofPath = "/home/sean/Silencer/build/src/GTS.proof.bin";
 
         //Generate Transaction Send
         {
             /* generate circuit */
+#if DEBUG
             libff::print_header("Gunero Generator");
+#endif
 
             GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
 
@@ -387,6 +630,14 @@ int main ()
             assert(proven);
 
             saveToFile(GTSproofPath, proof);
+
+            GuneroTransactionSendWitness gtsw(
+                W,
+                T,
+                V_S,
+                V_R,
+                L_P);
+            saveToFile(GTSwitnessPath, gtsw);
         }
 
         //Verify Transaction Send
@@ -459,13 +710,15 @@ int main ()
         std::string GTRr1csPath = "/home/sean/Silencer/build/src/GTR.r1cs.bin";
         std::string GTRpkPath = "/home/sean/Silencer/build/src/GTR.pk.bin";
         std::string GTRvkPath = "/home/sean/Silencer/build/src/GTR.vk.bin";
-
+        std::string GTRwitnessPath = "/home/sean/Silencer/build/src/GTR.witness.bin";
         std::string GTRproofPath = "/home/sean/Silencer/build/src/GTR.proof.bin";
 
         //Generate Transaction Receive
         {
             /* generate circuit */
+#if DEBUG
             libff::print_header("Gunero Generator");
+#endif
 
             GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
 
@@ -504,6 +757,14 @@ int main ()
             assert(proven);
 
             saveToFile(GTRproofPath, proof);
+
+            GuneroTransactionReceiveWitness gtrw(
+                W,
+                T,
+                V_S,
+                V_R,
+                L);
+            saveToFile(GTRwitnessPath, gtrw);
         }
 
         //Verify Transaction Receive

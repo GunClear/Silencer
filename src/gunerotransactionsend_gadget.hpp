@@ -254,7 +254,9 @@ public:
         const std::string& vkPath
         )
     {
+#if DEBUG
         libff::print_header("Gunero constraints");
+#endif
 
         // The true passed here ensures all the inputs
         // are boolean constrained.
@@ -309,7 +311,9 @@ public:
             saveToFile(r1csPath, constraint_system);
         }
 
+#if DEBUG
         printf("\n"); libff::print_indent(); libff::print_mem("after generator"); libff::print_time("after generator");
+#endif
 
         r1cs_ppzksnark_keypair<BaseT> keypair = r1cs_ppzksnark_generator<BaseT>(constraint_system);
 
@@ -326,7 +330,9 @@ public:
             saveToFile(vkPath, keypair.vk);
         }
 
+#if DEBUG
         printf("\n"); libff::print_indent(); libff::print_mem("after constraints"); libff::print_time("after constraints");
+#endif
     }
 
     // Public Parameters:

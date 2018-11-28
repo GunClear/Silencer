@@ -31,6 +31,56 @@ using namespace libsnark;
 
 namespace gunero {
 
+class GuneroTransactionSendWitness{
+public:
+    uint256 W;
+    uint256 T;
+    uint256 V_S;
+    uint256 V_R;
+    uint256 L_P;
+
+    GuneroTransactionSendWitness() {}
+    GuneroTransactionSendWitness(
+        const uint256& pW,
+        const uint256& pT,
+        const uint256& pV_S,
+        const uint256& pV_R,
+        const uint256& pL_P
+    ) : W(pW),
+        T(pT),
+        V_S(pV_S),
+        V_R(pV_R),
+        L_P(pL_P)
+    {
+    }
+    ~GuneroTransactionSendWitness() {}
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(W);
+        READWRITE(T);
+        READWRITE(V_S);
+        READWRITE(V_R);
+        READWRITE(L_P);
+    }
+
+    friend std::ostream& operator<<(std::ostream &out, const GuneroTransactionSendWitness &witness)
+    {
+        ::Serialize(out, witness, 1, 1);
+
+        return out;
+    }
+
+    friend std::istream& operator>>(std::istream &in, GuneroTransactionSendWitness &witness)
+    {
+        ::Unserialize(in, witness, 1, 1);
+
+        return in;
+    }
+};
+
 ///// TRANSACTION SEND PROOF /////
 // With this proof, we are validating that the sender of the token is accepting that this token's ownership should
 // be transferred to the new transaction hash given. The "account view hash" validates that this proof is consistent
@@ -94,7 +144,9 @@ public:
         GuneroProof& proof
     )
     {
+#if DEBUG
         libff::print_header("Gunero witness (proof)");
+#endif
 
         {
             r1cs_primary_input<FieldT> primary_input;
@@ -102,7 +154,9 @@ public:
             {
                 protoboard<FieldT> pb;
                 {
+#if DEBUG
                     libff::print_header("Gunero gunerotransactionsend_gadget.load_r1cs_constraints()");
+#endif
 
                     gunerotransactionsend_gadget<FieldT, BaseT, HashT> gunero(pb);
 
@@ -120,7 +174,9 @@ public:
                         pP_proof_R
                     );
 
+#if DEBUG
                     printf("\n"); libff::print_indent(); libff::print_mem("after gunerotransactionsend_gadget.load_r1cs_constraints()"); libff::print_time("after gunerotransactionsend_gadget.load_r1cs_constraints()");
+#endif
                 }
 
                 // The constraint system must be satisfied or there is an unimplemented
@@ -158,7 +214,9 @@ public:
 
             proof = GuneroProof(r1cs_proof);
 
+#if DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
+#endif
         }
 
         //Verify
@@ -207,7 +265,9 @@ public:
                 r1cs_proof
             );
 
+#if DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
+#endif
 
             if (verified)
             {

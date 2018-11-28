@@ -31,6 +31,56 @@ using namespace libsnark;
 
 namespace gunero {
 
+class GuneroTransactionReceiveWitness{
+public:
+    uint256 W;
+    uint256 T;
+    uint256 V_S;
+    uint256 V_R;
+    uint256 L;
+
+    GuneroTransactionReceiveWitness() {}
+    GuneroTransactionReceiveWitness(
+        const uint256& pW,
+        const uint256& pT,
+        const uint256& pV_S,
+        const uint256& pV_R,
+        const uint256& pL
+    ) : W(pW),
+        T(pT),
+        V_S(pV_S),
+        V_R(pV_R),
+        L(pL)
+    {
+    }
+    ~GuneroTransactionReceiveWitness() {}
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        READWRITE(W);
+        READWRITE(T);
+        READWRITE(V_S);
+        READWRITE(V_R);
+        READWRITE(L);
+    }
+
+    friend std::ostream& operator<<(std::ostream &out, const GuneroTransactionReceiveWitness &witness)
+    {
+        ::Serialize(out, witness, 1, 1);
+
+        return out;
+    }
+
+    friend std::istream& operator>>(std::istream &in, GuneroTransactionReceiveWitness &witness)
+    {
+        ::Unserialize(in, witness, 1, 1);
+
+        return in;
+    }
+};
+
 ///// TRANSACTION RECEIVE PROOF /////
 // Public Parameters:
 // Authorization Root Hash (W)
@@ -95,7 +145,9 @@ public:
         GuneroProof& proof
     )
     {
+#if DEBUG
         libff::print_header("Gunero witness (proof)");
+#endif
 
         {
             r1cs_primary_input<FieldT> primary_input;
@@ -103,7 +155,9 @@ public:
             {
                 protoboard<FieldT> pb;
                 {
+#if DEBUG
                     libff::print_header("Gunero gunerotransactionreceive_gadget.load_r1cs_constraints()");
+#endif
 
                     gunerotransactionreceive_gadget<FieldT, BaseT, HashT> gunero(pb);
 
@@ -123,7 +177,9 @@ public:
                         pP_proof_S
                     );
 
+#if DEBUG
                     printf("\n"); libff::print_indent(); libff::print_mem("after gunerotransactionreceive_gadget.load_r1cs_constraints()"); libff::print_time("after gunerotransactionreceive_gadget.load_r1cs_constraints()");
+#endif
                 }
 
                 // The constraint system must be satisfied or there is an unimplemented
@@ -161,7 +217,9 @@ public:
 
             proof = GuneroProof(r1cs_proof);
 
+#if DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
+#endif
         }
 
         //Verify
@@ -210,7 +268,9 @@ public:
                 r1cs_proof
             );
 
+#if DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
+#endif
 
             if (verified)
             {
