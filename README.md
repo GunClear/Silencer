@@ -4,7 +4,21 @@ Zero-Knowledge Proof lib for Gunero
 ----
 
 # Installation and Demo
-<!-- TODO: Add instructions for compilation and running a demo with the current Silencer circuit keys -->
+
+## Installation
+```bash
+$ cd depends
+$ git submodule init
+$ git submodule update
+$ cd libsnark/depends
+$ git submodule init
+$ git submodule update
+$ cd ../../../
+$ mkdir build
+# cd build
+$ cmake ..
+$ make
+```
 
 ## Demo Instructions
 
@@ -156,16 +170,4 @@ $ ../silencer verify --circuit=authorization \
         --account-view-hash=./sender-view.hash \
         --proof=./receiver-auth.proof
 FAIL!
-=======
-```bash
-$ mkdir build
-$ cd depends
-$ git submodule init
-$ git submodule update
-$ cd libsnark/depends
-$ git submodule init
-$ git submodule update
-$ cd ../../../build
-$ cmake ..
-$ make
 ```
