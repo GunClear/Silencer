@@ -4,11 +4,10 @@ import os
 import ctypes
 
 if __name__ == '__main__':
-    GTSvkPath = ctypes.create_string_buffer(b'/home/sean/Silencer/build/src/GTS.vk.bin')
-    GTSwitnessPath = ctypes.create_string_buffer(b'/home/sean/Silencer/build/src/GTS.witness.bin')
-    GTSproofPath = ctypes.create_string_buffer(b'/home/sean/Silencer/build/src/GTS.proof.bin')
-    libc = ctypes.cdll.LoadLibrary("/home/sean/Silencer/build/src/silencer")
-    # print("silencer loaded: ", libc)
+    GTSvkPath = ctypes.create_string_buffer(b'../build/src/GTS.vk.bin')
+    GTSwitnessPath = ctypes.create_string_buffer(b'../build/src/GTS.witness.bin')
+    GTSproofPath = ctypes.create_string_buffer(b'../build/src/GTS.proof.bin')
+    libc = ctypes.cdll.LoadLibrary("../build/src/silencer")
 
     ret = libc.verify_send_wit(GTSwitnessPath, GTSvkPath, GTSproofPath)
 
