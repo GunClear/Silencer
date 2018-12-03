@@ -8,8 +8,8 @@ add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
 
 include_directories(.)
 
-add_executable(
-  silencer
+add_library(
+  silencer SHARED
 
   util.cpp
   main.cpp
@@ -26,6 +26,31 @@ target_link_libraries(
 )
 target_include_directories(
   silencer
+
+  PUBLIC
+  ${DEPENDS_DIR}/libsnark
+  ${DEPENDS_DIR}/libsnark/depends/libfqfft
+)
+
+add_executable(
+  silencershell
+
+  util.cpp
+  main.cpp
+  maincaller.cpp
+  GuneroProof.cpp
+  gunero_merkle_tree.cpp
+  gunero_merkle_tree_gadget.cpp
+  keccak_gadget.cpp
+  uint256.cpp
+)
+target_link_libraries(
+  silencershell
+
+  snark
+)
+target_include_directories(
+  silencershell
 
   PUBLIC
   ${DEPENDS_DIR}/libsnark

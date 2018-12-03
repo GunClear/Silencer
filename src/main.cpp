@@ -55,7 +55,7 @@ extern "C" int prove_membership(
     uint8_t N_account,
     const char* V_accountHex,
     const char* s_accountHex,
-    const char* M_accountPath,
+    const char* M_accountHexArray,
     const char* A_accountHex,
     const char* r_accountHex,
     const char* pkPath,
@@ -104,388 +104,6 @@ extern "C" int prove_receive(
 //Full test
 extern "C" int full_test(const char* path);
 
-void show_command_line()
-{
-    printf("\nusage: silencer [option]\n");
-}
-
-int main(int argc, const char* argv[])
-{
-    if (argc <= 1)
-    {
-        // show_command_line();
-        // return -1;
-
-        const char** argv_n = new const char*[2];
-        argv_n[0] = argv[0];
-        argv_n[1] = "9";
-        return main(2, argv_n);
-    }
-
-    char *path = strdup(argv[0]);
-    char *last_slash = strrchr(path, '/');
-    if (last_slash)
-    {
-        *(last_slash + 1) = '\0';
-    }
-
-    libff::start_profiling();
-
-    //alt_bn128_pp
-    libff::init_alt_bn128_params();
-
-    //full_test
-    if (std::string(argv[1]) == "1")
-    {
-        printf("\nfull_test\n");
-
-        return full_test(path);
-    }
-
-    //verify_membership
-    if (std::string(argv[1]) == "2")
-    {
-        printf("\nverify_membership\n");
-
-        std::string GTMvkPath(path);
-        GTMvkPath.append("GTM.vk.bin");
-        std::string GTMwitnessPath(path);
-        GTMwitnessPath.append("GTM.witness.bin");
-        std::string GTMproofPath(path);
-        GTMproofPath.append("GTM.proof.bin");
-
-        GuneroMembershipWitness gmw;
-        loadFromFile(GTMwitnessPath, gmw);
-
-        std::string WHex = gmw.W.GetHex();
-        std::string V_accountHex = gmw.V_account.GetHex();
-
-        int ret = verify_membership(
-            WHex.c_str(),
-            gmw.N_account,
-            V_accountHex.c_str(),
-            GTMvkPath.c_str(),
-            GTMproofPath.c_str()
-        );
-
-        printf("verified: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    //verify_send
-    if (std::string(argv[1]) == "3")
-    {
-        printf("\nverify_send\n");
-
-        std::string GTSvkPath(path);
-        GTSvkPath.append("GTS.vk.bin");
-        std::string GTSwitnessPath(path);
-        GTSwitnessPath.append("GTS.witness.bin");
-        std::string GTSproofPath(path);
-        GTSproofPath.append("GTS.proof.bin");
-
-        GuneroTransactionSendWitness gtsw;
-        loadFromFile(GTSwitnessPath, gtsw);
-
-        std::string WHex = gtsw.W.GetHex();
-        std::string THex = gtsw.T.GetHex();
-        std::string V_SHex = gtsw.V_S.GetHex();
-        std::string V_RHex = gtsw.V_R.GetHex();
-        std::string L_PHex = gtsw.L_P.GetHex();
-
-        int ret = verify_send(
-            WHex.c_str(),
-            THex.c_str(),
-            V_SHex.c_str(),
-            V_RHex.c_str(),
-            L_PHex.c_str(),
-            GTSvkPath.c_str(),
-            GTSproofPath.c_str()
-        );
-
-        printf("verified: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    //verify_receive
-    if (std::string(argv[1]) == "4")
-    {
-        printf("\nverify_receive\n");
-
-        std::string GTRvkPath(path);
-        GTRvkPath.append("GTR.vk.bin");
-        std::string GTRwitnessPath(path);
-        GTRwitnessPath.append("GTR.witness.bin");
-        std::string GTRproofPath(path);
-        GTRproofPath.append("GTR.proof.bin");
-
-        GuneroTransactionReceiveWitness gtrw;
-        loadFromFile(GTRwitnessPath, gtrw);
-
-        std::string WHex = gtrw.W.GetHex();
-        std::string THex = gtrw.T.GetHex();
-        std::string V_SHex = gtrw.V_S.GetHex();
-        std::string V_RHex = gtrw.V_R.GetHex();
-        std::string LHex = gtrw.L.GetHex();
-
-        int ret = verify_receive(
-            WHex.c_str(),
-            THex.c_str(),
-            V_SHex.c_str(),
-            V_RHex.c_str(),
-            LHex.c_str(),
-            GTRvkPath.c_str(),
-            GTRproofPath.c_str()
-        );
-
-        printf("verified: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    //prove_membership
-    if (std::string(argv[1]) == "5")
-    {
-        printf("\nprove_membership\n");
-
-        std::string GTMpkPath(path);
-        GTMpkPath.append("GTM.pk.bin");
-        std::string GTMvkPath(path);
-        GTMvkPath.append("GTM.vk.bin");
-        std::string GTMwitnessPath(path);
-        GTMwitnessPath.append("GTM.witness.bin");
-        std::string GTMproofPath(path);
-        GTMproofPath.append("GTM.proof.bin");
-
-        GuneroMembershipWitness gmw;
-        loadFromFile(GTMwitnessPath, gmw);
-
-        std::string WHex = gmw.W.GetHex();
-        std::string V_accountHex = gmw.V_account.GetHex();
-
-        std::string s_accountHex;// = CARP;
-        std::string M_accountPath;// = CARP;
-        std::string A_accountHex;// = CARP;
-        std::string r_accountHex;// = CARP;
-
-        int ret = prove_membership(
-            WHex.c_str(),
-            gmw.N_account,
-            V_accountHex.c_str(),
-            s_accountHex.c_str(),
-            M_accountPath.c_str(),
-            A_accountHex.c_str(),
-            r_accountHex.c_str(),
-            GTMpkPath.c_str(),
-            GTMvkPath.c_str(),
-            GTMproofPath.c_str()
-        );
-
-        printf("proven: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    //prove_send
-    if (std::string(argv[1]) == "6")
-    {
-        printf("\nprove_send\n");
-
-        std::string GTSpkPath(path);
-        GTSpkPath.append("GTS.pk.bin");
-        std::string GTSvkPath(path);
-        GTSvkPath.append("GTS.vk.bin");
-        std::string GTSwitnessPath(path);
-        GTSwitnessPath.append("GTS.witness.bin");
-        std::string GTSproofPath(path);
-        GTSproofPath.append("GTS.proof.bin");
-
-        GuneroTransactionSendWitness gtsw;
-        loadFromFile(GTSwitnessPath, gtsw);
-
-        std::string WHex = gtsw.W.GetHex();
-        std::string THex = gtsw.T.GetHex();
-        std::string V_SHex = gtsw.V_S.GetHex();
-        std::string V_RHex = gtsw.V_R.GetHex();
-        std::string L_PHex = gtsw.L_P.GetHex();
-
-        std::string s_SHex;// = CARP;
-        std::string r_SHex;// = CARP;
-        std::string r_RHex;// = CARP;
-        std::string A_PSHex;// = CARP;
-        std::string W_PHex;// = CARP;
-        std::string P_proof_RHex;// = CARP;
-
-        int ret = prove_send(
-            WHex.c_str(),
-            THex.c_str(),
-            V_SHex.c_str(),
-            V_RHex.c_str(),
-            L_PHex.c_str(),
-            s_SHex.c_str(),
-            r_SHex.c_str(),
-            r_RHex.c_str(),
-            A_PSHex.c_str(),
-            W_PHex.c_str(),
-            P_proof_RHex.c_str(),
-            GTSpkPath.c_str(),
-            GTSvkPath.c_str(),
-            GTSproofPath.c_str()
-        );
-
-        printf("proven: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    //prove_receive
-    if (std::string(argv[1]) == "7")
-    {
-        printf("\nprove_receive\n");
-
-        std::string GTRpkPath(path);
-        GTRpkPath.append("GTR.pk.bin");
-        std::string GTRvkPath(path);
-        GTRvkPath.append("GTR.vk.bin");
-        std::string GTRwitnessPath(path);
-        GTRwitnessPath.append("GTR.witness.bin");
-        std::string GTRproofPath(path);
-        GTRproofPath.append("GTR.proof.bin");
-
-        GuneroTransactionReceiveWitness gtrw;
-        loadFromFile(GTRwitnessPath, gtrw);
-
-        std::string WHex = gtrw.W.GetHex();
-        std::string THex = gtrw.T.GetHex();
-        std::string V_SHex = gtrw.V_S.GetHex();
-        std::string V_RHex = gtrw.V_R.GetHex();
-        std::string LHex = gtrw.L.GetHex();
-
-        std::string s_RHex;// = CARP;
-        std::string r_RHex;// = CARP;
-        std::string A_SHex;// = CARP;
-        std::string r_SHex;// = CARP;
-        std::string FHex;// = CARP;
-        std::string jHex;// = CARP;
-        std::string A_RHex;// = CARP;
-        std::string P_proof_SHex;// = CARP;
-
-        int ret = prove_receive(
-            WHex.c_str(),
-            THex.c_str(),
-            V_SHex.c_str(),
-            V_RHex.c_str(),
-            LHex.c_str(),
-            s_RHex.c_str(),
-            r_RHex.c_str(),
-            A_SHex.c_str(),
-            r_SHex.c_str(),
-            FHex.c_str(),
-            jHex.c_str(),
-            A_RHex.c_str(),
-            P_proof_SHex.c_str(),
-            GTRpkPath.c_str(),
-            GTRvkPath.c_str(),
-            GTRproofPath.c_str()
-        );
-
-        printf("proven: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    //verify_send_wit
-    if (std::string(argv[1]) == "9")
-    {
-        printf("\nverify_send_wit\n");
-
-        std::string GTSvkPath(path);
-        GTSvkPath.append("GTS.vk.bin");
-        std::string GTSwitnessPath(path);
-        GTSwitnessPath.append("GTS.witness.bin");
-        std::string GTSproofPath(path);
-        GTSproofPath.append("GTS.proof.bin");
-
-        int ret = verify_send_wit(
-            GTSwitnessPath.c_str(),
-            GTSvkPath.c_str(),
-            GTSproofPath.c_str()
-        );
-
-        printf("verified: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
-
-        return ret;
-    }
-
-    show_command_line();
-    return -1;
-}
-
 //Verify Membership
 extern "C" int verify_membership(
     const char* WHex,
@@ -495,6 +113,11 @@ extern "C" int verify_membership(
     const char* proofPath
     )
 {
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     const size_t MERKLE_TREE_DEPTH  = 160UL;
 
     uint256 W;
@@ -542,6 +165,11 @@ extern "C" int verify_send(
     const char* proofPath
     )
 {
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     uint256 W;
     W.SetHex(WHex);
 
@@ -603,6 +231,16 @@ extern "C" int verify_send_wit(
     std::string V_RHex = gtsw.V_R.GetHex();
     std::string L_PHex = gtsw.L_P.GetHex();
 
+#if DEBUG
+    std::cout << "WHex: " << WHex << "\n";
+    std::cout << "THex: " << THex << "\n";
+    std::cout << "V_SHex: " << V_SHex << "\n";
+    std::cout << "V_RHex: " << V_RHex << "\n";
+    std::cout << "L_PHex: " << L_PHex << "\n";
+    std::cout << "vkPath: " << vkPath << "\n";
+    std::cout << "proofPath: " << proofPath << "\n";
+#endif
+
     return verify_send(
         WHex.c_str(),
         THex.c_str(),
@@ -625,6 +263,11 @@ extern "C" int verify_receive(
     const char* proofPath
     )
 {
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     uint256 W;
     W.SetHex(WHex);
 
@@ -676,7 +319,7 @@ extern "C" int prove_membership(
     uint8_t N_account,
     const char* V_accountHex,
     const char* s_accountHex,
-    const char* M_accountPath,
+    const char* M_accountHexArray,
     const char* A_accountHex,
     const char* r_accountHex,
     const char* pkPath,
@@ -684,6 +327,11 @@ extern "C" int prove_membership(
     const char* proofPath
     )
 {
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     const size_t MERKLE_TREE_DEPTH  = 160UL;
 
     uint256 W;
@@ -696,7 +344,57 @@ extern "C" int prove_membership(
     V_account.SetHex(s_accountHex);
 
     std::vector<gunero_merkle_authentication_node> M_account;
-    loadFromFile(M_accountPath, M_account);
+    {
+        const int MaxPossibleSize = 67 * 160;//64 hex, plus possible "0x" start, plus possible ";" end
+        int M_accountHexArray_len = strnlen(M_accountHexArray, MaxPossibleSize + 1);
+        if ((M_accountHexArray_len <= 0) || (M_accountHexArray_len > MaxPossibleSize))
+        {//Malformed M_account
+            return -2;
+        }
+        char node_buffer[67];//64 hex, plus possible "0x" start, plus null
+        uint256 node_uint256;
+        libff::bit_vector node;
+        const char* start = M_accountHexArray;
+        while (true)
+        {
+            const char* next = strchr(start, ';');
+            memset(node_buffer, 0, 67);
+            if (next == NULL)
+            {
+                if (strlen(start) > 66)
+                {//Malformed M_account
+                    return -2;
+                }
+                strcpy(node_buffer, start);
+                node_uint256.SetHex(node_buffer);
+                node = uint256_to_bool_vector(node_uint256);
+
+                M_account.push_back(node);
+
+                //Done
+                break;
+            }
+            else
+            {
+                if ((next - start) > 66)
+                {//Malformed M_account
+                    return -2;
+                }
+                strncpy(node_buffer, start, next - start);
+                node_uint256.SetHex(node_buffer);
+                node = uint256_to_bool_vector(node_uint256);
+
+                M_account.push_back(node);
+
+                //Look for next
+                start = next + 1;
+            }
+        }
+        if (M_account.size() != 160)
+        {//Malformed M_account
+            return -3;
+        }
+    }
 
     uint160 A_account;
     A_account.SetHex(A_accountHex);
@@ -755,39 +453,94 @@ extern "C" int prove_send(
     const char* proofPath
     )
 {
+#if DEBUG
+    std::cout << "WHex: " << WHex << "\n";
+    std::cout << "THex: " << THex << "\n";
+    std::cout << "V_SHex: " << V_SHex << "\n";
+    std::cout << "V_RHex: " << V_RHex << "\n";
+    std::cout << "L_PHex: " << L_PHex << "\n";
+    std::cout << "s_SHex: " << s_SHex << "\n";
+    std::cout << "r_SHex: " << r_SHex << "\n";
+    std::cout << "r_RHex: " << r_RHex << "\n";
+    std::cout << "A_PSHex: " << A_PSHex << "\n";
+    std::cout << "W_PHex: " << W_PHex << "\n";
+    std::cout << "P_proof_RHex: " << P_proof_RHex << "\n";
+    std::cout << "pkPath: " << pkPath << "\n";
+    std::cout << "vkPath: " << vkPath << "\n";
+    std::cout << "proofPath: " << proofPath << "\n";
+#endif
+
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     uint256 W;
     W.SetHex(WHex);
+#if DEBUG
+    std::cout << "W: " << W.GetHex() << "\n";
+#endif
 
     uint256 T;
     T.SetHex(THex);
+#if DEBUG
+    std::cout << "T: " << T.GetHex() << "\n";
+#endif
 
     uint256 V_S;
     V_S.SetHex(V_SHex);
+#if DEBUG
+    std::cout << "V_S: " << V_S.GetHex() << "\n";
+#endif
 
     uint256 V_R;
     V_R.SetHex(V_RHex);
+#if DEBUG
+    std::cout << "V_R: " << V_R.GetHex() << "\n";
+#endif
 
     uint256 L_P;
     L_P.SetHex(L_PHex);
+#if DEBUG
+    std::cout << "L_P: " << L_P.GetHex() << "\n";
+#endif
 
     uint256 s_S_256;
     s_S_256.SetHex(s_SHex);
     uint252 s_S(s_S_256);
+#if DEBUG
+    std::cout << "s_S: " << s_S_256.GetHex() << "\n";
+#endif
 
     uint256 r_S;
     r_S.SetHex(r_SHex);
+#if DEBUG
+    std::cout << "r_S: " << r_S.GetHex() << "\n";
+#endif
 
     uint256 r_R;
     r_R.SetHex(r_RHex);
+#if DEBUG
+    std::cout << "r_R: " << r_R.GetHex() << "\n";
+#endif
 
     uint160 A_PS;
     A_PS.SetHex(A_PSHex);
+#if DEBUG
+    std::cout << "A_PS: " << A_PS.GetHex() << "\n";
+#endif
 
     uint256 W_P;
     W_P.SetHex(W_PHex);
+#if DEBUG
+    std::cout << "W_P: " << W_P.GetHex() << "\n";
+#endif
 
     uint256 P_proof_R;
     P_proof_R.SetHex(P_proof_RHex);
+#if DEBUG
+    std::cout << "P_proof_R: " << P_proof_R.GetHex() << "\n";
+#endif
 
     r1cs_ppzksnark_proving_key<BaseType> pk;
     loadFromFile(pkPath, pk);
@@ -848,6 +601,11 @@ extern "C" int prove_receive(
     const char* proofPath
     )
 {
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     uint256 W;
     W.SetHex(WHex);
 
@@ -940,6 +698,9 @@ extern "C" int full_test(const char* path)
     std::srand(std::time(NULL));
 
     libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
 
     //Test SHA256
     if (TEST_SHA256)
