@@ -6,7 +6,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "cd build && cmake .. && make -j$TOTAL_PROCESSORS",
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make -j$TOTAL_PROCESSORS",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -27,8 +27,19 @@
         {
             "label": "rebuild",
             "type": "shell",
-            "command": "cd build && cmake .. && make clean && make -j$TOTAL_PROCESSORS",
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make clean && make -j$TOTAL_PROCESSORS",
             "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "build release",
+            "type": "shell",
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j$TOTAL_PROCESSORS",
+            "group": {
+                "kind": "build",
+            },
             "problemMatcher": [
                 "$gcc"
             ]

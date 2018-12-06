@@ -208,11 +208,12 @@ int main(int argc, const char* argv[])
         printf("\nUnable to discover root path!\n");
         return -1;
     }
+    printf("\n%s\n", path);
 
-    libff::start_profiling();
+    // libff::start_profiling();
 
-    //alt_bn128_pp
-    libff::init_alt_bn128_params();
+    // //alt_bn128_pp
+    // libff::init_alt_bn128_params();
 
     //full_test
     if (std::string(argv[1]) == "1")
@@ -409,30 +410,21 @@ int main(int argc, const char* argv[])
     {
         printf("\nprove_send\n");
 
-        std::string GTSpkPath(path);
-        GTSpkPath.append("GTS.pk.bin");
-        std::string GTSvkPath(path);
-        GTSvkPath.append("GTS.vk.bin");
-        std::string GTSwitnessPath(path);
-        GTSwitnessPath.append("GTS.witness.bin");
-        std::string GTSproofPath(path);
-        GTSproofPath.append("GTS.proof.bin");
+        std::string GTSpkPath("/home/sean/Silencer/demo/GTS.pk.bin");
+        std::string GTSvkPath("/home/sean/Silencer/demo/GTS.vk.bin");
+        std::string GTSproofPath("/home/sean/Silencer/demo/GTS.proof.test.bin");
 
-        GuneroTransactionSendWitness gtsw;
-        loadFromFile(GTSwitnessPath, gtsw);
-
-        std::string WHex = gtsw.W.GetHex();
-        std::string THex = gtsw.T.GetHex();
-        std::string V_SHex = gtsw.V_S.GetHex();
-        std::string V_RHex = gtsw.V_R.GetHex();
-        std::string L_PHex = gtsw.L_P.GetHex();
-
-        std::string s_SHex;// = CARP;
-        std::string r_SHex;// = CARP;
-        std::string r_RHex;// = CARP;
-        std::string A_PSHex;// = CARP;
-        std::string W_PHex;// = CARP;
-        std::string P_proof_RHex;// = CARP;
+        std::string WHex("8a05e4bb6ecc0891346c813960e2a03b496d04c719299278ce23a9c407317649");
+        std::string THex("a1dce3b29c0881c8e78c89adadf00f816ce77a2373a43ce154ac6f2c2743c3bb");
+        std::string V_SHex("f5da29b399859f2f13bc4c51ed197a710d1a4a8f8f812b3bd1bf4e3add86b81f");
+        std::string V_RHex("782791b7da8d329d0e169ae4642cec05eaa102b3f70f720f1dd2a535407c865a");
+        std::string L_PHex("6f9127a505971eb2d995714337fdd2741922533fda6d4a21d1c1d9ccce33788c");
+        std::string s_SHex("0c43a98ba9ec557c54a47826df6a4c694bc13b829e7fb68f066a1ccfb0daa34d");
+        std::string r_SHex("1d4cd8c7382d438cd2bcb2b126fe1a72bf56f45ed5aaeddb150aaac5e44d1201");
+        std::string r_RHex("beaaefcac20b6167e4fcc54d01bfbc1932eab75475232ed087e14f3680dd7c3e");
+        std::string A_PSHex("99eac8d1180c5deac80f9bee0db660cd0c542be1");
+        std::string W_PHex("ff18bc142266d906b4ec084dd6d01feedc7cd8a48c7493992af3663648911747");
+        std::string P_proof_RHex("297177444968e060ef727bff8a333a0514a34db05b862dc0fc1e44fb06c9bd34");
 
         int ret = prove_send(
             WHex.c_str(),

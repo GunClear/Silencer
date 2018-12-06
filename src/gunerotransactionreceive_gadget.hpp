@@ -25,7 +25,6 @@
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 
 #include "uint252.h"
-#include "gunero_alt_gadget.hpp"
 
 using namespace libsnark;
 
@@ -71,7 +70,8 @@ public:
     std::shared_ptr<digest_variable<FieldT>> L;
 
     // Aux inputs
-    pb_variable<FieldT> ZERO;
+    // pb_variable<FieldT> ZERO;
+    std::shared_ptr<digest_variable<FieldT>> ZERO;
     std::shared_ptr<digest_variable<FieldT>> s_R;
     std::shared_ptr<digest_variable<FieldT>> r_R;
     std::shared_ptr<digest_variable<FieldT>> A_S;
@@ -83,7 +83,8 @@ public:
 
     // Computed variables
     std::shared_ptr<digest_variable<FieldT>> P_proof_R;
-    std::shared_ptr<PRF_addr_a_pk_simple_gadget<FieldT>> spend_authority;
+    // std::shared_ptr<PRF_addr_a_pk_simple_gadget<FieldT>> spend_authority;
+    std::shared_ptr<HashT> spend_authority;
     std::shared_ptr<digest_variable<FieldT>> view_hash_1_digest;
     std::shared_ptr<HashT> view_hash_1_hasher;
     std::shared_ptr<HashT> view_hash_2_hasher;
@@ -135,7 +136,8 @@ public:
         //
         // The first variable of our constraint system is constrained
         // to be one automatically for us, and is known as `ONE`.
-        ZERO.allocate(pb);
+        // ZERO.allocate(pb);
+        ZERO.reset(new digest_variable<FieldT>(pb, 256, ""));
 
         //We enforce 256 bits instead of 252 because of hash size compliance
         s_R.reset(new digest_variable<FieldT>(pb, 256, ""));//252
@@ -156,12 +158,18 @@ public:
 
         P_proof_R.reset(new digest_variable<FieldT>(pb, 256, ""));
 
-        spend_authority.reset(new PRF_addr_a_pk_simple_gadget<FieldT>(
+        // spend_authority.reset(new PRF_addr_a_pk_simple_gadget<FieldT>(
+        //     pb,
+        //     ZERO,
+        //     s_R->bits,
+        //     P_proof_R
+        // ));
+        spend_authority.reset(new HashT(
             pb,
-            ZERO,
-            s_R->bits,
-            P_proof_R
-        ));
+            *s_R,
+            *ZERO,
+            *P_proof_R,
+            "spend_authority"));
 
         //hash(P_proof_S, hash(W, r_S)) == V_S
         view_hash_1_digest.reset(new digest_variable<FieldT>(pb, 256, ""));
@@ -268,7 +276,7 @@ public:
         const std::string& vkPath
         )
     {
-#if DEBUG
+#ifdef DEBUG
         libff::print_header("Gunero constraints");
 #endif
 
@@ -277,7 +285,8 @@ public:
         unpacker->generate_r1cs_constraints(true);
 
         // Constrain `ZERO`
-        generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
+        // generate_r1cs_equals_const_constraint<FieldT>(this->pb, ZERO, FieldT::zero(), "ZERO");
+        ZERO->generate_r1cs_constraints();
 
         s_R->generate_r1cs_constraints();
 
@@ -331,7 +340,7 @@ public:
             saveToFile(r1csPath, constraint_system);
         }
 
-#if DEBUG
+#ifdef DEBUG
         printf("\n"); libff::print_indent(); libff::print_mem("after generator"); libff::print_time("after generator");
 #endif
 
@@ -350,7 +359,7 @@ public:
             saveToFile(vkPath, keypair.vk);
         }
 
-#if DEBUG
+#ifdef DEBUG
         printf("\n"); libff::print_indent(); libff::print_mem("after constraints"); libff::print_time("after constraints");
 #endif
     }
@@ -417,7 +426,11 @@ public:
         );
 
         // Witness `zero`
-        this->pb.val(ZERO) = FieldT::zero();
+        // this->pb.val(ZERO) = FieldT::zero();
+        ZERO->bits.fill_with_bits(
+            this->pb,
+            uint256_to_bool_vector(uint256())
+        );
 
         // Witness s_R for the input
         s_R->bits.fill_with_bits(

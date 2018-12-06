@@ -144,7 +144,7 @@ public:
         GuneroProof& proof
     )
     {
-#if DEBUG
+#ifdef DEBUG
         libff::print_header("Gunero witness (proof)");
 #endif
 
@@ -154,7 +154,7 @@ public:
             {
                 protoboard<FieldT> pb;
                 {
-#if DEBUG
+#ifdef DEBUG
                     libff::print_header("Gunero gunerotransactionsend_gadget.load_r1cs_constraints()");
 #endif
 
@@ -174,7 +174,7 @@ public:
                         pP_proof_R
                     );
 
-#if DEBUG
+#ifdef DEBUG
                     printf("\n"); libff::print_indent(); libff::print_mem("after gunerotransactionsend_gadget.load_r1cs_constraints()"); libff::print_time("after gunerotransactionsend_gadget.load_r1cs_constraints()");
 #endif
                 }
@@ -214,7 +214,7 @@ public:
 
             proof = GuneroProof(r1cs_proof);
 
-#if DEBUG
+#ifdef DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
 #endif
         }
@@ -264,10 +264,6 @@ public:
                 primary_input,
                 r1cs_proof
             );
-
-#if DEBUG
-            printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
-#endif
 
             if (verified)
             {

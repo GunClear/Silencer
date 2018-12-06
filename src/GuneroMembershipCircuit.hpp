@@ -127,7 +127,7 @@ public:
     )
     {
         /* prepare test variables */
-#if DEBUG
+#ifdef DEBUG
         libff::print_header("Gunero prepare test variables");
 #endif
         M_account = std::vector<gunero_merkle_authentication_node>(tree_depth);
@@ -208,7 +208,7 @@ public:
             V_account = HashT::get_hash(block);//hash(P_proof, view_hash_1)
         }
 
-#if DEBUG
+#ifdef DEBUG
         printf("\n"); libff::print_indent(); libff::print_mem("after prepare test variables"); libff::print_time("after prepare test variables");
 #endif
     }
@@ -226,7 +226,7 @@ public:
         GuneroProof& proof
     )
     {
-#if DEBUG
+#ifdef DEBUG
         libff::print_header("Gunero witness (proof)");
 #endif
 
@@ -236,7 +236,7 @@ public:
             {
                 protoboard<FieldT> pb;
                 {
-#if DEBUG
+#ifdef DEBUG
                     libff::print_header("Gunero guneromembership_gadget.load_r1cs_constraints()");
 #endif
 
@@ -252,7 +252,7 @@ public:
                         pr_account
                     );
 
-#if DEBUG
+#ifdef DEBUG
                     printf("\n"); libff::print_indent(); libff::print_mem("after guneromembership_gadget.load_r1cs_constraints()"); libff::print_time("after guneromembership_gadget.load_r1cs_constraints()");
 #endif
                 }
@@ -290,7 +290,7 @@ public:
 
             proof = GuneroProof(r1cs_proof);
 
-#if DEBUG
+#ifdef DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after witness (proof)"); libff::print_time("after witness (proof)");
 #endif
         }
@@ -335,7 +335,7 @@ public:
                 r1cs_proof
             );
 
-#if DEBUG
+#ifdef DEBUG
             printf("\n"); libff::print_indent(); libff::print_mem("after verify"); libff::print_time("after verify");
 #endif
 

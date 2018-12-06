@@ -7,6 +7,7 @@
 #include "GuneroMembershipCircuit.hpp"
 #include "GuneroTransactionSendCircuit.hpp"
 #include "GuneroTransactionReceiveCircuit.hpp"
+#include "sha256_ethereum.hpp"
 
 using namespace libsnark;
 using namespace gunero;
@@ -134,7 +135,7 @@ extern "C" int verify_membership(
     GuneroProof proof;
     loadFromFile(proofPath, proof);
 
-    GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
+    GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
     bool verified = gmc.verify(
         W,
@@ -193,7 +194,7 @@ extern "C" int verify_send(
     GuneroProof proof;
     loadFromFile(proofPath, proof);
 
-    GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+    GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
 
     bool verified = gtsc.verify(
         W,
@@ -231,7 +232,7 @@ extern "C" int verify_send_wit(
     std::string V_RHex = gtsw.V_R.GetHex();
     std::string L_PHex = gtsw.L_P.GetHex();
 
-#if DEBUG
+#ifdef DEBUG
     std::cout << "WHex: " << WHex << "\n";
     std::cout << "THex: " << THex << "\n";
     std::cout << "V_SHex: " << V_SHex << "\n";
@@ -291,7 +292,7 @@ extern "C" int verify_receive(
     GuneroProof proof;
     loadFromFile(proofPath, proof);
 
-    GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
+    GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtrc;
 
     bool verified = gtrc.verify(
         W,
@@ -408,7 +409,7 @@ extern "C" int prove_membership(
     r1cs_ppzksnark_verification_key<BaseType> vk;
     loadFromFile(vkPath, vk);
 
-    GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
+    GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
     GuneroProof proof;
     bool proven = gmc.prove(
@@ -423,10 +424,10 @@ extern "C" int prove_membership(
         vk,
         proof);
 
-    saveToFile(proofPath, proof);
-
     if (proven)
     {
+        saveToFile(proofPath, proof);
+
         return 0;
     }
     else
@@ -453,7 +454,7 @@ extern "C" int prove_send(
     const char* proofPath
     )
 {
-#if DEBUG
+#ifdef DEBUG
     std::cout << "WHex: " << WHex << "\n";
     std::cout << "THex: " << THex << "\n";
     std::cout << "V_SHex: " << V_SHex << "\n";
@@ -477,68 +478,68 @@ extern "C" int prove_send(
 
     uint256 W;
     W.SetHex(WHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "W: " << W.GetHex() << "\n";
 #endif
 
     uint256 T;
     T.SetHex(THex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "T: " << T.GetHex() << "\n";
 #endif
 
     uint256 V_S;
     V_S.SetHex(V_SHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "V_S: " << V_S.GetHex() << "\n";
 #endif
 
     uint256 V_R;
     V_R.SetHex(V_RHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "V_R: " << V_R.GetHex() << "\n";
 #endif
 
     uint256 L_P;
     L_P.SetHex(L_PHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "L_P: " << L_P.GetHex() << "\n";
 #endif
 
     uint256 s_S_256;
     s_S_256.SetHex(s_SHex);
     uint252 s_S(s_S_256);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "s_S: " << s_S_256.GetHex() << "\n";
 #endif
 
     uint256 r_S;
     r_S.SetHex(r_SHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "r_S: " << r_S.GetHex() << "\n";
 #endif
 
     uint256 r_R;
     r_R.SetHex(r_RHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "r_R: " << r_R.GetHex() << "\n";
 #endif
 
     uint160 A_PS;
     A_PS.SetHex(A_PSHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "A_PS: " << A_PS.GetHex() << "\n";
 #endif
 
     uint256 W_P;
     W_P.SetHex(W_PHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "W_P: " << W_P.GetHex() << "\n";
 #endif
 
     uint256 P_proof_R;
     P_proof_R.SetHex(P_proof_RHex);
-#if DEBUG
+#ifdef DEBUG
     std::cout << "P_proof_R: " << P_proof_R.GetHex() << "\n";
 #endif
 
@@ -550,11 +551,9 @@ extern "C" int prove_send(
 
     r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
 
+    GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
+
     GuneroProof proof;
-    loadFromFile(proofPath, proof);
-
-    GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
-
     bool proven = gtsc.prove(
         W,
         T,
@@ -573,6 +572,8 @@ extern "C" int prove_send(
 
     if (proven)
     {
+        saveToFile(proofPath, proof);
+
         return 0;
     }
     else
@@ -654,11 +655,9 @@ extern "C" int prove_receive(
 
     r1cs_ppzksnark_processed_verification_key<BaseType> vk_precomp = r1cs_ppzksnark_verifier_process_vk<BaseType>(vk);
 
+    GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtrc;
+
     GuneroProof proof;
-    loadFromFile(proofPath, proof);
-
-    GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
-
     bool proven = gtrc.prove(
         W,
         T,
@@ -679,6 +678,8 @@ extern "C" int prove_receive(
 
     if (proven)
     {
+        saveToFile(proofPath, proof);
+
         return 0;
     }
     else
@@ -690,10 +691,10 @@ extern "C" int prove_receive(
 extern "C" int full_test(const char* path)
 {
     const size_t MERKLE_TREE_DEPTH  = 160UL;
-    const bool TEST_SHA256 = false;
-    const bool EXECUTE_MEMBERSHIP = true;
+    // const bool TEST_SHA256 = false;
+    const bool EXECUTE_MEMBERSHIP = false;
     const bool EXECUTE_TRANSACTION_SEND = true;
-    const bool EXECUTE_TRANSACTION_RECEIVE = true;
+    const bool EXECUTE_TRANSACTION_RECEIVE = false;
 
     std::srand(std::time(NULL));
 
@@ -702,20 +703,20 @@ extern "C" int full_test(const char* path)
     //alt_bn128_pp
     libff::init_alt_bn128_params();
 
-    //Test SHA256
-    if (TEST_SHA256)
-    {
-        const libff::bit_vector left_bv = libff::int_list_to_bits({0x426bc2d8, 0x4dc86782, 0x81e8957a, 0x409ec148, 0xe6cffbe8, 0xafe6ba4f, 0x9c6f1978, 0xdd7af7e9}, 32);
-        const libff::bit_vector right_bv = libff::int_list_to_bits({0x038cce42, 0xabd366b8, 0x3ede7e00, 0x9130de53, 0x72cdf73d, 0xee825114, 0x8cb48d1b, 0x9af68ad0}, 32);
-        const libff::bit_vector hash_bv = libff::int_list_to_bits({0xeffd0b7f, 0x1ccba116, 0x2ee816f7, 0x31c62b48, 0x59305141, 0x990e5c0a, 0xce40d33d, 0x0b1167d1}, 32);
+    // //Test SHA256
+    // if (TEST_SHA256)
+    // {
+    //     const libff::bit_vector left_bv = libff::int_list_to_bits({0x426bc2d8, 0x4dc86782, 0x81e8957a, 0x409ec148, 0xe6cffbe8, 0xafe6ba4f, 0x9c6f1978, 0xdd7af7e9}, 32);
+    //     const libff::bit_vector right_bv = libff::int_list_to_bits({0x038cce42, 0xabd366b8, 0x3ede7e00, 0x9130de53, 0x72cdf73d, 0xee825114, 0x8cb48d1b, 0x9af68ad0}, 32);
+    //     const libff::bit_vector hash_bv = libff::int_list_to_bits({0xeffd0b7f, 0x1ccba116, 0x2ee816f7, 0x31c62b48, 0x59305141, 0x990e5c0a, 0xce40d33d, 0x0b1167d1}, 32);
 
-        libff::bit_vector block;
-        block.insert(block.end(), left_bv.begin(), left_bv.end());
-        block.insert(block.end(), right_bv.begin(), right_bv.end());
-        libff::bit_vector hash_bv_calc = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
+    //     libff::bit_vector block;
+    //     block.insert(block.end(), left_bv.begin(), left_bv.end());
+    //     block.insert(block.end(), right_bv.begin(), right_bv.end());
+    //     libff::bit_vector hash_bv_calc = sha256_ethereum<FieldType>::get_hash(block);
 
-        assert(hash_bv_calc == hash_bv);
-    }
+    //     assert(hash_bv_calc == hash_bv);
+    // }
 
     ///// MEMBERSHIP PROOF /////
     // Public Parameters:
@@ -758,7 +759,7 @@ extern "C" int full_test(const char* path)
         libff::bit_vector A_account_padded_lsb;
         libff::bit_vector V_account_lsb;
 
-        GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH>::makeTestVariables(
+        GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH>::makeTestVariables(
             s_account,
             N_account,
             r_account,
@@ -796,11 +797,11 @@ extern "C" int full_test(const char* path)
         //Generate Membership
         {
             /* generate circuit */
-#if DEBUG
+#ifdef DEBUG
             libff::print_header("Gunero Generator");
 #endif
 
-            GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
+            GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
             gmc.generate(GTMr1csPath, GTMpkPath, GTMvkPath);
         }
@@ -813,7 +814,7 @@ extern "C" int full_test(const char* path)
             r1cs_ppzksnark_verification_key<BaseType> vk;
             loadFromFile(GTMvkPath, vk);
 
-            GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
+            GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
             GuneroProof proof;
             bool proven = gmc.prove(
@@ -849,7 +850,7 @@ extern "C" int full_test(const char* path)
             GuneroProof proof;
             loadFromFile(GTMproofPath, proof);
 
-            GuneroMembershipCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>, MERKLE_TREE_DEPTH> gmc;
+            GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH> gmc;
 
             bool verified = gmc.verify(
                 W,
@@ -936,17 +937,17 @@ extern "C" int full_test(const char* path)
             block.insert(block.end(), F_lsb.begin(), F_lsb.end());
             block.insert(block.end(), j_lsb.begin(), j_lsb.end());
 
-            libff::bit_vector T_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
+            libff::bit_vector T_lsb = sha256_ethereum<FieldType>::get_hash(block);
 
             T = bool_vector_to_uint256(T_lsb);
         }
         {//P_proof_S = PRF(s_S)
             libff::bit_vector s_S_lsb = uint252_to_bool_vector_256(s_S);
 
-            libff::bit_vector block(sha256_two_to_one_hash_gadget<FieldType>::get_digest_len());
+            libff::bit_vector block(sha256_ethereum<FieldType>::get_digest_len());
             block.insert(block.begin(), s_S_lsb.begin(), s_S_lsb.end());
 
-            libff::bit_vector P_proof_S_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block);
+            libff::bit_vector P_proof_S_lsb = sha256_ethereum<FieldType>::get_hash(block);
 
             P_proof_S = bool_vector_to_uint256(P_proof_S_lsb);
         }
@@ -958,7 +959,7 @@ extern "C" int full_test(const char* path)
             block_1.insert(block_1.end(), W_lsb.begin(), W_lsb.end());
             block_1.insert(block_1.end(), r_S_lsb.begin(), r_S_lsb.end());
 
-            libff::bit_vector hash_1 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_1);
+            libff::bit_vector hash_1 = sha256_ethereum<FieldType>::get_hash(block_1);
 
             libff::bit_vector P_proof_S_lsb = uint256_to_bool_vector(P_proof_S);
 
@@ -966,7 +967,7 @@ extern "C" int full_test(const char* path)
             block_2.insert(block_2.end(), P_proof_S_lsb.begin(), P_proof_S_lsb.end());
             block_2.insert(block_2.end(), hash_1.begin(), hash_1.end());
 
-            libff::bit_vector V_S_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_2);
+            libff::bit_vector V_S_lsb = sha256_ethereum<FieldType>::get_hash(block_2);
 
             V_S = bool_vector_to_uint256(V_S_lsb);
         }
@@ -978,7 +979,7 @@ extern "C" int full_test(const char* path)
             block_1.insert(block_1.end(), T_lsb.begin(), T_lsb.end());
             block_1.insert(block_1.end(), W_P_lsb.begin(), W_P_lsb.end());
 
-            libff::bit_vector hash_1 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_1);
+            libff::bit_vector hash_1 = sha256_ethereum<FieldType>::get_hash(block_1);
 
             libff::bit_vector s_S_lsb = uint252_to_bool_vector_256(s_S);
 
@@ -986,7 +987,7 @@ extern "C" int full_test(const char* path)
             block_2.insert(block_2.end(), s_S_lsb.begin(), s_S_lsb.end());
             block_2.insert(block_2.end(), hash_1.begin(), hash_1.end());
 
-            libff::bit_vector hash_2 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_2);
+            libff::bit_vector hash_2 = sha256_ethereum<FieldType>::get_hash(block_2);
 
             libff::bit_vector A_PS_lsb = uint160_to_bool_vector_256_rpad(A_PS);
 
@@ -994,7 +995,7 @@ extern "C" int full_test(const char* path)
             block_3.insert(block_3.end(), A_PS_lsb.begin(), A_PS_lsb.end());
             block_3.insert(block_3.end(), hash_2.begin(), hash_2.end());
 
-            libff::bit_vector L_P_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_3);
+            libff::bit_vector L_P_lsb = sha256_ethereum<FieldType>::get_hash(block_3);
 
             L_P = bool_vector_to_uint256(L_P_lsb);
         }
@@ -1006,7 +1007,7 @@ extern "C" int full_test(const char* path)
             block_1.insert(block_1.end(), T_lsb.begin(), T_lsb.end());
             block_1.insert(block_1.end(), W_lsb.begin(), W_lsb.end());
 
-            libff::bit_vector hash_1 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_1);
+            libff::bit_vector hash_1 = sha256_ethereum<FieldType>::get_hash(block_1);
 
             libff::bit_vector s_R_lsb = uint252_to_bool_vector_256(s_R);
 
@@ -1014,7 +1015,7 @@ extern "C" int full_test(const char* path)
             block_2.insert(block_2.end(), s_R_lsb.begin(), s_R_lsb.end());
             block_2.insert(block_2.end(), hash_1.begin(), hash_1.end());
 
-            libff::bit_vector hash_2 = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_2);
+            libff::bit_vector hash_2 = sha256_ethereum<FieldType>::get_hash(block_2);
 
             libff::bit_vector A_S_lsb = uint160_to_bool_vector_256_rpad(A_S);
 
@@ -1022,7 +1023,7 @@ extern "C" int full_test(const char* path)
             block_3.insert(block_3.end(), A_S_lsb.begin(), A_S_lsb.end());
             block_3.insert(block_3.end(), hash_2.begin(), hash_2.end());
 
-            libff::bit_vector L_lsb = sha256_two_to_one_hash_gadget<FieldType>::get_hash(block_3);
+            libff::bit_vector L_lsb = sha256_ethereum<FieldType>::get_hash(block_3);
 
             L = bool_vector_to_uint256(L_lsb);
         }
@@ -1030,6 +1031,31 @@ extern "C" int full_test(const char* path)
 
     if (EXECUTE_TRANSACTION_SEND)
     {
+// #ifdef DEBUG
+        std::cout << "GuneroTransactionSendCircuit:\n";
+
+        std::cout << "s_S: " << s_S.inner().GetHex() << "\n";
+        std::cout << "r_S: " << r_S.GetHex() << "\n";
+        std::cout << "A_PS: " << A_PS.GetHex() << "\n";
+        std::cout << "W_P: " << W_P.GetHex() << "\n";
+        std::cout << "F: " << F.GetHex() << "\n";
+        std::cout << "j: " << j.GetHex() << "\n";
+
+        std::cout << "\n";
+
+        std::cout << "W: " << W.GetHex() << "\n";
+        std::cout << "T: " << T.GetHex() << "\n";
+        std::cout << "V_S: " << V_S.GetHex() << "\n";
+        std::cout << "V_R: " << V_R.GetHex() << "\n";
+        std::cout << "L_P: " << L_P.GetHex() << "\n";
+        std::cout << "s_S: " << s_S.inner().GetHex() << "\n";
+        std::cout << "r_S: " << r_S.GetHex() << "\n";
+        std::cout << "r_R: " << r_R.GetHex() << "\n";
+        std::cout << "A_PS: " << A_PS.GetHex() << "\n";
+        std::cout << "W_P: " << W_P.GetHex() << "\n";
+        std::cout << "P_proof_R: " << P_proof_R.GetHex() << "\n";
+// #endif
+
         std::string GTSr1csPath(path);
         GTSr1csPath.append("GTS.r1cs.bin");
         std::string GTSpkPath(path);
@@ -1041,17 +1067,17 @@ extern "C" int full_test(const char* path)
         std::string GTSproofPath(path);
         GTSproofPath.append("GTS.proof.bin");
 
-        //Generate Transaction Send
-        {
-            /* generate circuit */
-#if DEBUG
-            libff::print_header("Gunero Generator");
-#endif
+//         //Generate Transaction Send
+//         {
+//             /* generate circuit */
+// #ifdef DEBUG
+//             libff::print_header("Gunero Generator");
+// #endif
 
-            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+//             GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
 
-            gtsc.generate(GTSr1csPath, GTSpkPath, GTSvkPath);
-        }
+//             gtsc.generate(GTSr1csPath, GTSpkPath, GTSvkPath);
+//         }
 
         //Prove Transaction Receive
         {
@@ -1061,7 +1087,7 @@ extern "C" int full_test(const char* path)
             r1cs_ppzksnark_verification_key<BaseType> vk;
             loadFromFile(GTSvkPath, vk);
 
-            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
 
             GuneroProof proof;
             bool proven = gtsc.prove(
@@ -1103,7 +1129,7 @@ extern "C" int full_test(const char* path)
             GuneroProof proof;
             loadFromFile(GTSproofPath, proof);
 
-            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtsc;
+            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
 
             bool verified = gtsc.verify(
                 W,
@@ -1174,11 +1200,11 @@ extern "C" int full_test(const char* path)
         //Generate Transaction Receive
         {
             /* generate circuit */
-#if DEBUG
+#ifdef DEBUG
             libff::print_header("Gunero Generator");
 #endif
 
-            GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
+            GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtrc;
 
             gtrc.generate(GTRr1csPath, GTRpkPath, GTRvkPath);
         }
@@ -1191,7 +1217,7 @@ extern "C" int full_test(const char* path)
             r1cs_ppzksnark_verification_key<BaseType> vk;
             loadFromFile(GTRvkPath, vk);
 
-            GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
+            GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtrc;
 
             GuneroProof proof;
             bool proven = gtrc.prove(
@@ -1235,7 +1261,7 @@ extern "C" int full_test(const char* path)
             GuneroProof proof;
             loadFromFile(GTRproofPath, proof);
 
-            GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_two_to_one_hash_gadget<FieldType>> gtrc;
+            GuneroTransactionReceiveCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtrc;
 
             bool verified = gtrc.verify(
                 W,

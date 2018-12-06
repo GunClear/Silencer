@@ -8,7 +8,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/src/silencer",
+            "program": "${workspaceFolder}/build/src/silencershell",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
