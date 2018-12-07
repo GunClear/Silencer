@@ -105,6 +105,20 @@ extern "C" int prove_receive(
 //Full test
 extern "C" int full_test(const char* path);
 
+std::string bit_vectorToHex(libff::bit_vector blob)
+{
+    char psz[(blob.size() / 4) + 1];
+    for (unsigned int i = 0; i < (blob.size() / 8); i++)
+    {
+        int data = 0;
+        for (unsigned int j = 0; j < 8; j++)
+            if (blob[(i * 8) + j])
+                data |= (1 << (7 - j));
+        sprintf(psz + (i * 2), "%02x", data);
+    }
+    return std::string(psz);
+}
+
 //Verify Membership
 extern "C" int verify_membership(
     const char* WHex,
@@ -691,10 +705,9 @@ extern "C" int prove_receive(
 extern "C" int full_test(const char* path)
 {
     const size_t MERKLE_TREE_DEPTH  = 160UL;
-    // const bool TEST_SHA256 = false;
-    const bool EXECUTE_MEMBERSHIP = false;
+    const bool EXECUTE_MEMBERSHIP = true;
     const bool EXECUTE_TRANSACTION_SEND = true;
-    const bool EXECUTE_TRANSACTION_RECEIVE = false;
+    const bool EXECUTE_TRANSACTION_RECEIVE = true;
 
     std::srand(std::time(NULL));
 
@@ -702,21 +715,6 @@ extern "C" int full_test(const char* path)
 
     //alt_bn128_pp
     libff::init_alt_bn128_params();
-
-    // //Test SHA256
-    // if (TEST_SHA256)
-    // {
-    //     const libff::bit_vector left_bv = libff::int_list_to_bits({0x426bc2d8, 0x4dc86782, 0x81e8957a, 0x409ec148, 0xe6cffbe8, 0xafe6ba4f, 0x9c6f1978, 0xdd7af7e9}, 32);
-    //     const libff::bit_vector right_bv = libff::int_list_to_bits({0x038cce42, 0xabd366b8, 0x3ede7e00, 0x9130de53, 0x72cdf73d, 0xee825114, 0x8cb48d1b, 0x9af68ad0}, 32);
-    //     const libff::bit_vector hash_bv = libff::int_list_to_bits({0xeffd0b7f, 0x1ccba116, 0x2ee816f7, 0x31c62b48, 0x59305141, 0x990e5c0a, 0xce40d33d, 0x0b1167d1}, 32);
-
-    //     libff::bit_vector block;
-    //     block.insert(block.end(), left_bv.begin(), left_bv.end());
-    //     block.insert(block.end(), right_bv.begin(), right_bv.end());
-    //     libff::bit_vector hash_bv_calc = sha256_ethereum<FieldType>::get_hash(block);
-
-    //     assert(hash_bv_calc == hash_bv);
-    // }
 
     ///// MEMBERSHIP PROOF /////
     // Public Parameters:
@@ -783,6 +781,20 @@ extern "C" int full_test(const char* path)
 
     if (EXECUTE_MEMBERSHIP)
     {
+#ifdef DEBUG
+        std::cout << "GuneroMembershipCircuit:\n";
+        std::cout << "W: " << W.GetHex() << "\n";
+        std::cout << "N_account: " << (int)N_account << "\n";
+        std::cout << "V_account: " << V_account.GetHex() << "\n";
+        std::cout << "s_account: " << s_account.inner().GetHex() << "\n";
+        std::cout << "A_account: " << A_account.GetHex() << "\n";
+        std::cout << "r_account: " << r_account.GetHex() << "\n";
+        for (int loop_M_account = 0; loop_M_account < M_account.size(); loop_M_account++)
+        {
+            std::cout << "M_account[" << loop_M_account << "]: " << bit_vectorToHex(M_account[loop_M_account]) << "\n";
+        }
+#endif
+
         std::string GTMr1csPath(path);
         GTMr1csPath.append("GTM.r1cs.bin");
         std::string GTMpkPath(path);
@@ -1031,7 +1043,7 @@ extern "C" int full_test(const char* path)
 
     if (EXECUTE_TRANSACTION_SEND)
     {
-// #ifdef DEBUG
+#ifdef DEBUG
         std::cout << "GuneroTransactionSendCircuit:\n";
 
         std::cout << "s_S: " << s_S.inner().GetHex() << "\n";
@@ -1054,7 +1066,7 @@ extern "C" int full_test(const char* path)
         std::cout << "A_PS: " << A_PS.GetHex() << "\n";
         std::cout << "W_P: " << W_P.GetHex() << "\n";
         std::cout << "P_proof_R: " << P_proof_R.GetHex() << "\n";
-// #endif
+#endif
 
         std::string GTSr1csPath(path);
         GTSr1csPath.append("GTS.r1cs.bin");
@@ -1067,17 +1079,17 @@ extern "C" int full_test(const char* path)
         std::string GTSproofPath(path);
         GTSproofPath.append("GTS.proof.bin");
 
-//         //Generate Transaction Send
-//         {
-//             /* generate circuit */
-// #ifdef DEBUG
-//             libff::print_header("Gunero Generator");
-// #endif
+        //Generate Transaction Send
+        {
+            /* generate circuit */
+#ifdef DEBUG
+            libff::print_header("Gunero Generator");
+#endif
 
-//             GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
+            GuneroTransactionSendCircuit<FieldType, BaseType, sha256_ethereum<FieldType>> gtsc;
 
-//             gtsc.generate(GTSr1csPath, GTSpkPath, GTSvkPath);
-//         }
+            gtsc.generate(GTSr1csPath, GTSpkPath, GTSvkPath);
+        }
 
         //Prove Transaction Receive
         {

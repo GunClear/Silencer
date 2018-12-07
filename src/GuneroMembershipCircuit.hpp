@@ -22,7 +22,6 @@
 #include <libff/common/utils.hpp>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 
-#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 

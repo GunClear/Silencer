@@ -20,7 +20,6 @@
 #include <libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp>
 #include <libff/common/utils.hpp>
 
-#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_update_gadget.hpp>
 
