@@ -31,156 +31,149 @@ using namespace libsnark;
 
 namespace gunero {
 
-const size_t Keccak256_digest_size = 256;
-const size_t Keccak256_block_size = 512;
-
 template<typename FieldT>
-pb_linear_combination_array<FieldT> Keccak256_default_IV(protoboard<FieldT> &pb);
-
-template<typename FieldT>
-class keccak256_message_schedule_gadget : public gadget<FieldT> {
+class xor10_gadget : public gadget<FieldT> {
+private:
+    pb_variable_array<FieldT> result_bits;
+    std::vector<pb_variable<FieldT>> tmp_vars;
 public:
-    std::vector<pb_variable_array<FieldT> > W_bits;
-    std::vector<std::shared_ptr<packing_gadget<FieldT> > > pack_W;
+    pb_linear_combination<FieldT> Am0;
+    pb_linear_combination<FieldT> Am1;
+    pb_linear_combination<FieldT> Am2;
+    pb_linear_combination<FieldT> Am3;
+    pb_linear_combination<FieldT> Am4;
+    pb_linear_combination<FieldT> Ap0;
+    pb_linear_combination<FieldT> Ap1;
+    pb_linear_combination<FieldT> Ap2;
+    pb_linear_combination<FieldT> Ap3;
+    pb_linear_combination<FieldT> Ap4;
+    pb_variable<FieldT> result;
+    std::shared_ptr<packing_gadget<FieldT> > pack_result;
 
-    std::vector<pb_variable<FieldT> > sigma0;
-    std::vector<pb_variable<FieldT> > sigma1;
-    std::vector<std::shared_ptr<small_sigma_gadget<FieldT> > > compute_sigma0;
-    std::vector<std::shared_ptr<small_sigma_gadget<FieldT> > > compute_sigma1;
-    std::vector<pb_variable<FieldT> > unreduced_W;
-    std::vector<std::shared_ptr<lastbits_gadget<FieldT> > > mod_reduce_W;
-public:
-    pb_variable_array<FieldT> M;
-    pb_variable_array<FieldT> packed_W;
-    keccak256_message_schedule_gadget(protoboard<FieldT> &pb,
-                                   const pb_variable_array<FieldT> &M,
-                                   const pb_variable_array<FieldT> &packed_W,
-                                   const std::string &annotation_prefix);
+    xor10_gadget(protoboard<FieldT> &pb,
+                const pb_linear_combination<FieldT> &Am0,
+                const pb_linear_combination<FieldT> &Am1,
+                const pb_linear_combination<FieldT> &Am2,
+                const pb_linear_combination<FieldT> &Am3,
+                const pb_linear_combination<FieldT> &Am4,
+                const pb_linear_combination<FieldT> &Ap0,
+                const pb_linear_combination<FieldT> &Ap1,
+                const pb_linear_combination<FieldT> &Ap2,
+                const pb_linear_combination<FieldT> &Ap3,
+                const pb_linear_combination<FieldT> &Ap4,
+                const pb_variable<FieldT> &result,
+                const std::string &annotation_prefix);
+
     void generate_r1cs_constraints();
     void generate_r1cs_witness();
 };
 
 template<typename FieldT>
-class keccak256_round_function_gadget : public gadget<FieldT> {
+class rot_xor2_gadget : public gadget<FieldT> {
 public:
-    pb_variable<FieldT> sigma0;
-    pb_variable<FieldT> sigma1;
-    std::shared_ptr<big_sigma_gadget<FieldT> > compute_sigma0;
-    std::shared_ptr<big_sigma_gadget<FieldT> > compute_sigma1;
-    pb_variable<FieldT> choice;
-    pb_variable<FieldT> majority;
-    std::shared_ptr<choice_gadget<FieldT> > compute_choice;
-    std::shared_ptr<majority_gadget<FieldT> > compute_majority;
-    pb_variable<FieldT> packed_d;
-    std::shared_ptr<packing_gadget<FieldT> > pack_d;
-    pb_variable<FieldT> packed_h;
-    std::shared_ptr<packing_gadget<FieldT> > pack_h;
-    pb_variable<FieldT> unreduced_new_a;
-    pb_variable<FieldT> unreduced_new_e;
-    std::shared_ptr<lastbits_gadget<FieldT> > mod_reduce_new_a;
-    std::shared_ptr<lastbits_gadget<FieldT> > mod_reduce_new_e;
-    pb_variable<FieldT> packed_new_a;
-    pb_variable<FieldT> packed_new_e;
-public:
-    pb_linear_combination_array<FieldT> a;
-    pb_linear_combination_array<FieldT> b;
-    pb_linear_combination_array<FieldT> c;
-    pb_linear_combination_array<FieldT> d;
-    pb_linear_combination_array<FieldT> e;
-    pb_linear_combination_array<FieldT> f;
-    pb_linear_combination_array<FieldT> g;
-    pb_linear_combination_array<FieldT> h;
-    pb_variable<FieldT> W;
-    long K;
-    pb_linear_combination_array<FieldT> new_a;
-    pb_linear_combination_array<FieldT> new_e;
+    pb_linear_combination<FieldT> A;
+    pb_linear_combination<FieldT> D;
+    uint64_t r;
 
-    keccak256_round_function_gadget(protoboard<FieldT> &pb,
-                                 const pb_linear_combination_array<FieldT> &a,
-                                 const pb_linear_combination_array<FieldT> &b,
-                                 const pb_linear_combination_array<FieldT> &c,
-                                 const pb_linear_combination_array<FieldT> &d,
-                                 const pb_linear_combination_array<FieldT> &e,
-                                 const pb_linear_combination_array<FieldT> &f,
-                                 const pb_linear_combination_array<FieldT> &g,
-                                 const pb_linear_combination_array<FieldT> &h,
-                                 const pb_variable<FieldT> &W,
-                                 const long &K,
-                                 const pb_linear_combination_array<FieldT> &new_a,
-                                 const pb_linear_combination_array<FieldT> &new_e,
-                                 const std::string &annotation_prefix);
+    rot_xor2_gadget(protoboard<FieldT> &pb,
+                const pb_linear_combination<FieldT> &A,
+                const pb_linear_combination<FieldT> &D,
+                const uint64_t &r,
+                const std::string &annotation_prefix);
 
     void generate_r1cs_constraints();
     void generate_r1cs_witness();
 };
 
-/**
- * Gadget for the Keccak256 sponge function.
- */
 template<typename FieldT>
-class keccak256_sponge_function_gadget : public gadget<FieldT> {
+class xor_not_and_xor : public gadget<FieldT> {
 public:
-    std::vector<pb_linear_combination_array<FieldT> > round_a;
-    std::vector<pb_linear_combination_array<FieldT> > round_b;
-    std::vector<pb_linear_combination_array<FieldT> > round_c;
-    std::vector<pb_linear_combination_array<FieldT> > round_d;
-    std::vector<pb_linear_combination_array<FieldT> > round_e;
-    std::vector<pb_linear_combination_array<FieldT> > round_f;
-    std::vector<pb_linear_combination_array<FieldT> > round_g;
-    std::vector<pb_linear_combination_array<FieldT> > round_h;
+    pb_linear_combination<FieldT> A;
+    pb_linear_combination<FieldT> D;
+    uint64_t RC;
 
-    pb_variable_array<FieldT> packed_W;
-    std::shared_ptr<keccak256_message_schedule_gadget<FieldT> > message_schedule;
-    std::vector<keccak256_round_function_gadget<FieldT> > round_functions;
+    xor_not_and_xor(protoboard<FieldT> &pb,
+                const pb_linear_combination<FieldT> &B1,
+                const pb_linear_combination<FieldT> &B2,
+                const pb_linear_combination<FieldT> &B3,
+                const uint64_t &RC,
+                const pb_linear_combination<FieldT> &A_out,
+                const std::string &annotation_prefix);
 
-    pb_variable_array<FieldT> unreduced_output;
-    pb_variable_array<FieldT> reduced_output;
-    std::vector<lastbits_gadget<FieldT> > reduce_output;
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
+template<typename FieldT>
+class xor_not_and : public gadget<FieldT> {
 public:
-    pb_linear_combination_array<FieldT> prev_output;
-    pb_variable_array<FieldT> new_block;
+    pb_linear_combination<FieldT> A;
+    pb_linear_combination<FieldT> D;
+
+    xor_not_and_xor(protoboard<FieldT> &pb,
+                const pb_linear_combination<FieldT> &B1,
+                const pb_linear_combination<FieldT> &B2,
+                const pb_linear_combination<FieldT> &B3,
+                const pb_linear_combination<FieldT> &A_out,
+                const std::string &annotation_prefix);
+
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
+// ========================================================================================
+// keccakf1600_round algorithm
+// ========================================================================================
+template<typename FieldT>
+class keccakf1600_round_gadget : public gadget<FieldT> {
+public:
+    std::vector<std::shared_ptr<xor10_gadget<FieldT>>> compute_xor10;
+    std::vector<std::shared_ptr<rot_xor2_gadget<FieldT>>> compute_rot_xor2;
+    std::vector<pb_variable<FieldT>> D;
+    std::vector<pb_variable<FieldT>> B;
+    std::shared_ptr<xor_not_and_xor<FieldT>> compute_xor_not_and_xor;
+    std::vector<std::shared_ptr<xor_not_and<FieldT>>> compute_xor_not_and;
+public:
+    std::vector<pb_linear_combination_array<FieldT>> round_A;
+    std::vector<pb_linear_combination_array<FieldT>> round_A_out;
+    uint64_t RC;
+
+    keccakf1600_round_gadget(protoboard<FieldT> &pb,
+                                const std::vector<pb_linear_combination_array<FieldT>> &round_A,
+                                const uint64_t &RC,
+                                const std::vector<pb_linear_combination_array<FieldT>> &round_A_out,
+                                const std::string &annotation_prefix);
+
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
+// ========================================================================================
+// keccakf1600 algorithm
+// ========================================================================================
+// IN: A[25]
+// OUT: A_OUT[25]
+// VARIABLES: A_TMP[25](23)
+// CIRCUITS: keccakf1600_round(24)
+template<typename FieldT>
+class keccakf1600_gadget : public gadget<FieldT> {
+private:
+    std::vector<std::vector<pb_linear_combination_array<FieldT>>> round_As;
+public:
+    // std::shared_ptr<keccak256_message_schedule_gadget<FieldT>> message_schedule;
+    std::vector<keccakf1600_round_gadget<FieldT>> round_functions;
+
+public:
+    pb_linear_combination_array<FieldT> input;
     digest_variable<FieldT> output;
 
-    keccak256_sponge_function_gadget(protoboard<FieldT> &pb,
-                                       const pb_linear_combination_array<FieldT> &prev_output,
-                                       const pb_variable_array<FieldT> &new_block,
-                                       const digest_variable<FieldT> &output,
-                                       const std::string &annotation_prefix);
+    keccakf1600_gadget(protoboard<FieldT> &pb,
+                const pb_linear_combination_array<FieldT> &input,
+                const digest_variable<FieldT> &output,
+                const std::string &annotation_prefix);
+
     void generate_r1cs_constraints();
     void generate_r1cs_witness();
-};
-
-/**
- * Gadget for the Keccak256 sponge function, viewed as a 2-to-1 hash
- * function, and using the pre-standardized SHA3 initialization vector but
- * otherwise the same as SHA3-256 variant specifications.
- * Note that for NULL input the sponge returns
- * c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
- */
-template<typename FieldT>
-class keccak256_two_to_one_hash_gadget : public gadget<FieldT> {
-public:
-    typedef libff::bit_vector hash_value_type;
-    //typedef merkle_authentication_path merkle_authentication_path_type;
-
-    std::shared_ptr<keccak256_sponge_function_gadget<FieldT> > f;
-
-    keccak256_two_to_one_hash_gadget(protoboard<FieldT> &pb,
-                                  const digest_variable<FieldT> &left,
-                                  const digest_variable<FieldT> &right,
-                                  const digest_variable<FieldT> &output,
-                                  const std::string &annotation_prefix);
-    keccak256_two_to_one_hash_gadget(protoboard<FieldT> &pb,
-                                  const size_t block_length,
-                                  const block_variable<FieldT> &input_block,
-                                  const digest_variable<FieldT> &output,
-                                  const std::string &annotation_prefix);
-
-    void generate_r1cs_witness();
-
-    static size_t get_block_len();
-    static size_t get_digest_len();
-    static libff::bit_vector get_hash(const libff::bit_vector &input);
 };
 
 } // end namespace `gunero`
