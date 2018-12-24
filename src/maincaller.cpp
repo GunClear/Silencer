@@ -104,6 +104,22 @@ extern "C" int prove_receive(
 //Full test
 extern "C" int full_test(const char* path);
 
+//Test Keccak hash
+extern "C" int test_keccak(
+    const char* LeftHex,
+    const char* RightHex,
+    char* HashHex,
+    const unsigned int HashHexSize
+    );
+
+//Test SHA-3 256 hash
+extern "C" int test_sha3_256(
+    const char* LeftHex,
+    const char* RightHex,
+    char* HashHex,
+    const unsigned int HashHexSize
+    );
+
 int get_executable_path(char* pBuf, const int len)
 {
     char szTmp[32];
@@ -144,51 +160,28 @@ int main(int argc, const char* argv[])
         // argv_n[1] = "9";
         // return main(2, argv_n);
 
-        const int len = 4096;
-        char pBuf[len];
-        char *path = NULL;
-        if (get_executable_path(pBuf, len))
-        {
-            path = pBuf;
-            char *last_slash = strrchr(path, '/');
-            if (last_slash)
-            {
-                *(last_slash + 1) = '\0';
-            }
-        }
-        else
-        {
-            printf("\nUnable to discover root path!\n");
-            return -1;
-        }
+        uint256 left;
+        std::string leftString = left.GetHex();
+        printf("left:\t%s\n", leftString.c_str());
 
-        printf("\nverify_send_wit\n");
+        uint256 right;
+        std::string rightString = right.GetHex();
+        printf("right:\t%s\n", rightString.c_str());
 
-        std::string GTSvkPath(path);
-        GTSvkPath.append("GTS.vk.bin");
-        std::string GTSwitnessPath(path);
-        GTSwitnessPath.append("GTS.witness.bin");
-        std::string GTSproofPath(path);
-        GTSproofPath.append("GTS.proof.bin");
+        const int len = (256/4) + 1;
+        char hashHex[len];
 
-        int ret = verify_send_wit(
-            GTSwitnessPath.c_str(),
-            GTSvkPath.c_str(),
-            GTSproofPath.c_str()
+        int ret = test_keccak(
+            leftString.c_str(),
+            rightString.c_str(),
+            hashHex,
+            len
         );
 
-        printf("verified: ");
-        if (ret)
-        {
-            printf("false");
-        }
-        else
-        {
-            printf("true");
-        }
-        printf("\n");
+        printf("hash:\t%s\n", hashHex);
+        printf("ret:\t%d\n", ret);
 
-        return ret;
+        return 0;
     }
 
     const int len = 4096;

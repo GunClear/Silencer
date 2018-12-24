@@ -1383,11 +1383,31 @@ extern "C" int test_keccak(
     uint8_t output[256/8];//256 bits
 
     int ret = keccak_256(output, 256/8, input, 512/8);
+    if (ret)
+    {
+        return ret;
+    }
 
     //char* hashHex = new char[(256/4) + 1];//256 bits in nibbles
     array_to_hex(output, 256/8, HashHex, (256/4) + 1);
 
-    return ret;
+    //keccak256
+    libff::bit_vector left_lsb = uint256_to_bool_vector(left);
+    libff::bit_vector right_lsb = uint256_to_bool_vector(right);
+
+    libff::bit_vector block;
+    block.insert(block.end(), left_lsb.begin(), left_lsb.end());
+    block.insert(block.end(), right_lsb.begin(), right_lsb.end());
+
+    libff::bit_vector output_lsb = keccak256_gadget<FieldType>::get_hash(block);
+
+    uint256 output_uint256 = bool_vector_to_uint256(output_lsb);
+
+    std::string outputHex = output_uint256.GetHex();
+
+    int difference = outputHex.compare(HashHex);
+
+    return difference;
 }
 
 /*** Constants. ***/
