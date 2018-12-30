@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 2.8)
 
 project(Silencer)
 
+#Force DEBUG
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCMAKE_BUILD_TYPE=Debug")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCMAKE_BUILD_TYPE=Debug")
+
 option(
   DEBUG
   "Enable debugging mode"
