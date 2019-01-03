@@ -93,6 +93,7 @@ public:
     std::shared_ptr<pb_linear_combination_array<FieldT>> B1;
     std::shared_ptr<pb_linear_combination_array<FieldT>> B2;
     std::shared_ptr<pb_linear_combination_array<FieldT>> B3;
+    const uint64_t RC;
     pb_linear_combination_array<FieldT> RC_bits;
     std::shared_ptr<pb_linear_combination_array<FieldT>> A_out;
 
@@ -165,22 +166,38 @@ public:
 // CIRCUITS: keccakf1600_round(24)
 template<typename FieldT>
 class keccakf1600_gadget : public gadget<FieldT> {
-private:
+public:
     const uint8_t delim;
     std::vector<std::vector<std::shared_ptr<pb_linear_combination_array<FieldT>>>> round_As;
-public:
     std::vector<keccakf1600_round_gadget<FieldT>> round_functions;
 
 public:
-    pb_linear_combination_array<FieldT> input;
+    block_variable<FieldT> input;
     digest_variable<FieldT> output;
 
     keccakf1600_gadget(protoboard<FieldT> &pb,
                 const uint8_t delim,
-                const pb_variable_array<FieldT> &input,
+                const block_variable<FieldT> &input,
                 const digest_variable<FieldT> &output,
                 const std::string &annotation_prefix);
 
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
+template<typename FieldT>
+class keccak256_message_schedule_gadget : public gadget<FieldT> {
+public:
+    std::vector<pb_variable_array<FieldT> > A_bits;
+    std::vector<std::shared_ptr<packing_gadget<FieldT> > > pack_A;
+
+public:
+    pb_variable_array<FieldT> A;
+    pb_variable_array<FieldT> packed_A;
+    keccak256_message_schedule_gadget(protoboard<FieldT> &pb,
+                                   const pb_variable_array<FieldT> &A,
+                                   const pb_variable_array<FieldT> &packed_A,
+                                   const std::string &annotation_prefix);
     void generate_r1cs_constraints();
     void generate_r1cs_witness();
 };
@@ -189,11 +206,11 @@ public:
 
 template<typename FieldT>
 class keccak256_gadget : gadget<FieldT> {
-private:
+public:
     const static uint8_t delim = 0x01;
     std::shared_ptr<block_variable<FieldT>> block1;
     std::shared_ptr<block_variable<FieldT>> block2;
-    std::shared_ptr<sha256_compression_function_gadget<FieldT>> hasher;
+    std::shared_ptr<keccakf1600_gadget<FieldT>> hasher;
 
 public:
 
@@ -215,7 +232,7 @@ public:
         ZERO.allocate(pb, "ZERO");
         pb.val(ZERO) = 0;
 
-        hasher.reset(new sha256_compression_function_gadget<FieldT>(
+        hasher.reset(new keccakf1600_gadget<FieldT>(
             pb,
             input_block,
             output,
@@ -233,7 +250,7 @@ public:
         ZERO.allocate(pb, "ZERO");
         pb.val(ZERO) = 0;
 
-        hasher.reset(new sha256_compression_function_gadget<FieldT>(
+        hasher.reset(new keccakf1600_gadget<FieldT>(
             pb,
             input_block.bits,
             output,
@@ -261,7 +278,7 @@ public:
         block_variable<FieldT> input_variable(pb, input.size(), "input");
         digest_variable<FieldT> output_variable(pb, KECCAK256_digest_size, "output");
 
-        keccakf1600_gadget<FieldT> f(pb, delim, input_variable.bits, output_variable, "f");
+        keccakf1600_gadget<FieldT> f(pb, delim, input_variable, output_variable, "f");
 
         input_variable.generate_r1cs_witness(input);
         f.generate_r1cs_witness();

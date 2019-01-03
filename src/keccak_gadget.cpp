@@ -130,10 +130,10 @@ xor_not_and_xor<FieldT>::xor_not_and_xor(protoboard<FieldT> &pb,
     B1(B1),
     B2(B2),
     B3(B3),
+    RC(RC),
+    RC_bits(64),
     A_out(A_out)
 {
-    RC_bits.fill_with_bits_of_ulong(pb, RC);
-
     tmp_vars.resize(128);
     for (size_t j = 0; j < 128; ++j)
     {
@@ -144,6 +144,8 @@ xor_not_and_xor<FieldT>::xor_not_and_xor(protoboard<FieldT> &pb,
 template<typename FieldT>
 void xor_not_and_xor<FieldT>::generate_r1cs_constraints()
 {
+    RC_bits.generate_r1cs_constraints();
+
     /*
         tmp = (1 - B) * C i.e. tmp = !B and C
         out = A + tmp - 2A tmp i.e. out = A xor tmp
@@ -159,6 +161,9 @@ void xor_not_and_xor<FieldT>::generate_r1cs_constraints()
 template<typename FieldT>
 void xor_not_and_xor<FieldT>::generate_r1cs_witness()
 {
+    RC_bits.fill_with_bits_of_ulong(this->pb, RC);
+    RC_bits.generate_r1cs_witness();
+
     for (size_t j = 0; j < 64; ++j)
     {
         this->pb.val(tmp_vars[2 * j]) = (FieldT(1) - this->pb.lc_val(B2[j])) * this->pb.lc_val(B3[j]);
@@ -363,6 +368,52 @@ void keccakf1600_round_gadget<FieldT>::generate_r1cs_witness()
     // }
 }
 
+template<typename FieldT>
+keccak256_message_schedule_gadget<FieldT>::keccak256_message_schedule_gadget(protoboard<FieldT> &pb,
+                                                                       const pb_variable_array<FieldT> &A,
+                                                                       const pb_variable_array<FieldT> &packed_A,
+                                                                       const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix),
+    A(A),
+    packed_A(packed_A)
+{
+    A_bits.resize(25);
+    pack_A.resize(25);
+
+    for (size_t i = 0; i < 8; ++i)
+    {
+        A_bits[i] = pb_variable_array<FieldT>(A.rbegin() + (8-i) * 64, A.rbegin() + (8-i) * 64);
+        pack_A[i].reset(new packing_gadget<FieldT>(pb, A_bits[i], packed_A[i], FMT(this->annotation_prefix, " pack_A_%zu", i)));
+    }
+
+    for (size_t i = 8; i < 25; ++i)
+    {
+        /* allocate the bit representation of packed_A[i] */
+        A_bits[i].allocate(pb, 64, FMT(this->annotation_prefix, " A_bits_%zu", i));
+
+        /* and finally reduce this into packed and bit representations */
+        pack_A[i].reset(new packing_gadget<FieldT>(pb, A_bits[i], packed_A[i], FMT(this->annotation_prefix, " pack_A_%zu", i)));
+    }
+}
+
+template<typename FieldT>
+void keccak256_message_schedule_gadget<FieldT>::generate_r1cs_constraints()
+{
+    for (size_t i = 0; i < 8; ++i)
+    {
+        pack_A[i]->generate_r1cs_constraints(false); // do not enforce bitness here; caller be aware.
+    }
+}
+
+template<typename FieldT>
+void keccak256_message_schedule_gadget<FieldT>::generate_r1cs_witness()
+{
+    for (size_t i = 0; i < 8; ++i)
+    {
+        pack_A[i]->generate_r1cs_witness_from_bits();
+    }
+}
+
 typedef libff::alt_bn128_pp BaseType;
 typedef libff::Fr<BaseType> FieldType;
 
@@ -379,7 +430,7 @@ const static uint32_t keccakf1600_rate = 1088;//bit 1088 of 1600
 template<>
 keccakf1600_gadget<FieldType>::keccakf1600_gadget(protoboard<FieldType> &pb,
                                                 const uint8_t delim,
-                                                const pb_variable_array<FieldType> &input,
+                                                const block_variable<FieldType> &input,
                                                 const digest_variable<FieldType> &output,
                                                 const std::string &annotation_prefix) :
     gadget<FieldType>(pb, annotation_prefix),
@@ -401,7 +452,8 @@ keccakf1600_gadget<FieldType>::keccakf1600_gadget(protoboard<FieldType> &pb,
     //Was: pb_linear_combination_array<FieldT> x
     //Is:  pb_variable_array<FieldT> bits -> pb_variable<FieldT>
 
-    assert(input.size() <= keccakf1600_rate);
+    assert(input.block_size <= keccakf1600_rate);
+    //assert(input.size() <= keccakf1600_rate);
 
 #if DEBUG
     printf("keccakf1600_gadget() 1\n");
@@ -497,7 +549,7 @@ void keccakf1600_gadget<FieldType>::generate_r1cs_witness()
     //Was: pb_linear_combination_array<FieldT> x
     //Is:  pb_variable_array<FieldT> bits -> pb_variable<FieldT>
 
-    libff::bit_vector input_bits = input.get_bits(pb);
+    libff::bit_vector input_bits = input.bits.get_bits(pb);
 
     unsigned long input_array[17];
     for (size_t i = 0; i < 17; ++i)
