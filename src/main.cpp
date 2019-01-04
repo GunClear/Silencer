@@ -828,6 +828,7 @@ extern "C" int calculate_Merkle_root(
     const libff::bit_vector &A_account,
     const libff::bit_vector &leaf,
     const std::vector<gunero_merkle_authentication_node> &M_account,
+    const int UseNewFormat,
     uint256 &W
 )
 {
@@ -2256,7 +2257,7 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
     GTMproofPath.append("GTM.demo.proof.bin");
 
     std::string GTMaccountPath(path);
-    GTMaccountPath.append("receiver.acct");//argv[2]);
+    GTMaccountPath.append("demo.acct");//argv[2]);
     std::string A_accountHex;
     loadFromFile(GTMaccountPath, A_accountHex);
     // uint160 A_account;
@@ -2264,7 +2265,7 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
     libff::bit_vector A_account_LSB(HexTobit_vector(A_accountHex));
 
     std::string GTMmerklePath(path);
-    GTMmerklePath.append("receiver-branch.ls");//argv[3]);
+    GTMmerklePath.append("demo.ls");//argv[3]);
     std::string M_accountHexArray;
     {
         std::stringstream ss;
@@ -2344,7 +2345,7 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
     // std::string WHex;
     // loadFromFile(GTMWPath, WHex);
     uint256 W;
-    int ret = calculate_Merkle_root(A_account_LSB, leaf, M_account, W);
+    int ret = calculate_Merkle_root(A_account_LSB, leaf, M_account, 0, W);
     std::string WHex = W.GetHex();
 
     std::string V_accountHex;//V_account == keccak256(P_proof, keccak256(W,r_account)

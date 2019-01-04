@@ -219,6 +219,8 @@ public:
         libff::bit_vector& W
     )
     {
+        const bool UseNewFormat = false;
+
 #ifdef DEBUG
         libff::print_header("Gunero calculateMerkleRoot()");
 #endif
@@ -237,7 +239,15 @@ public:
         for (long level = tree_depth-1; level >= 0; --level)
         {
             //A_account is accessed LSB but is processed as MSB (root) to LSB (leaf)
-            bool parameter_is_left = A_account.at(tree_depth-1-level);
+            bool parameter_is_left;
+            if (UseNewFormat)
+            {
+                parameter_is_left = A_account.at(tree_depth-1-level);
+            }
+            else
+            {
+                parameter_is_left = !A_account.at(level);
+            }
 
             // //Generate random uncle
             // libff::bit_vector uncle(HashT::get_digest_len());
