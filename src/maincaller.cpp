@@ -216,7 +216,9 @@ int main(int argc, const char* argv[])
             return -1;
         }
 
-        prove_membership_with_files(path, 4, 0);
+        int ret = prove_membership_with_files(path, 4, 0);
+
+        return ret;
     }
 
     const int len = 4096;

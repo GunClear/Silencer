@@ -148,7 +148,12 @@ libff::bit_vector HexTobit_vector(std::string s)
     {
         throw std::runtime_error("bad hex length");
     }
-    for (unsigned int i = 0; i < s.length(); i += 2)
+    int start = 0;
+    if ((s[1] == 'x') || (s[1] == 'X'))
+    {
+        start = 2;
+    }
+    for (unsigned int i = start; i < s.length(); i += 2)
     {
         int value = 0;
         switch (s[i])
@@ -494,11 +499,14 @@ extern "C" int prove_membership(
                 {//Malformed M_account
                     return -2;
                 }
-                strcpy(node_buffer, start);
-                node_uint256.SetHex(node_buffer);
-                node = uint256_to_bool_vector(node_uint256);
+                if (strlen(start) > 0)
+                {
+                    strcpy(node_buffer, start);
+                    node_uint256.SetHex(node_buffer);
+                    node = uint256_to_bool_vector(node_uint256);
 
-                M_account.push_back(node);
+                    M_account.push_back(node);
+                }
 
                 //Done
                 break;
@@ -814,6 +822,31 @@ extern "C" int prove_receive(
     {
         return -1;
     }
+}
+
+extern "C" int calculate_Merkle_root(
+    const libff::bit_vector &A_account,
+    const libff::bit_vector &leaf,
+    const std::vector<gunero_merkle_authentication_node> &M_account,
+    uint256 &W
+)
+{
+    const size_t MERKLE_TREE_DEPTH  = 160UL;
+
+    assert(M_account.size() == MERKLE_TREE_DEPTH);
+
+    libff::bit_vector W_lsb;
+
+    GuneroMembershipCircuit<FieldType, BaseType, sha256_ethereum<FieldType>, MERKLE_TREE_DEPTH>::calculateMerkleRoot(
+        A_account,
+        leaf,
+        M_account,
+        W_lsb
+        );
+
+    W = bool_vector_to_uint256(W_lsb);
+
+    return 0;
 }
 
 extern "C" int create_Merkle_root()
@@ -2178,6 +2211,11 @@ int keccak_256(uint8_t* out, size_t outlen, const uint8_t* in, size_t inlen) {
 
 extern "C" int prove_membership_with_files(const char* path, int argc, const char* argv[])
 {
+    libff::start_profiling();
+
+    //alt_bn128_pp
+    libff::init_alt_bn128_params();
+
     //Constants
     uint8_t N_account = 1;
 
@@ -2186,6 +2224,7 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
 
     uint256 s_account_256 = uint8_to_uint256(1);
     std::string s_accountHex = s_account_256.GetHex();
+    libff::bit_vector s_account_lsb(uint256_to_bool_vector(s_account_256));
 
     //Constants calculated
     libff::bit_vector N_account_lsb(uint256_to_bool_vector(uint8_to_uint256(N_account)));
@@ -2195,7 +2234,7 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
     libff::bit_vector leaf;
     {//P_proof = Hash(0000b | (s_account&252b), 0)
         libff::bit_vector block(sha256_ethereum<FieldType>::get_digest_len());
-        block.insert(block.begin(), s_account_256.begin(), s_account_256.end());
+        block.insert(block.begin(), s_account_lsb.begin(), s_account_lsb.end());
         assert(block.at(0) == false);
         assert(block.at(1) == false);
         assert(block.at(2) == false);
@@ -2220,6 +2259,9 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
     GTMaccountPath.append("receiver.acct");//argv[2]);
     std::string A_accountHex;
     loadFromFile(GTMaccountPath, A_accountHex);
+    // uint160 A_account;
+    // A_account.SetHex(A_accountHex);
+    libff::bit_vector A_account_LSB(HexTobit_vector(A_accountHex));
 
     std::string GTMmerklePath(path);
     GTMmerklePath.append("receiver-branch.ls");//argv[3]);
@@ -2241,12 +2283,69 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
 
         fh.close();
     }
+    std::vector<gunero_merkle_authentication_node> M_account;
+    {
+        const int MaxPossibleSize = 67 * 160;//64 hex, plus possible "0x" start, plus possible ";" end
+        int M_accountHexArray_len = strnlen(M_accountHexArray.c_str(), MaxPossibleSize + 1);
+        if ((M_accountHexArray_len <= 0) || (M_accountHexArray_len > MaxPossibleSize))
+        {//Malformed M_account
+            return -2;
+        }
+        char node_buffer[67];//64 hex, plus possible "0x" start, plus null
+        uint256 node_uint256;
+        libff::bit_vector node;
+        const char* start = M_accountHexArray.c_str();
+        while (true)
+        {
+            const char* next = strchr(start, ';');
+            memset(node_buffer, 0, 67);
+            if (next == NULL)
+            {
+                if (strlen(start) > 66)
+                {//Malformed M_account
+                    return -2;
+                }
+                if (strlen(start) > 0)
+                {
+                    strcpy(node_buffer, start);
+                    node_uint256.SetHex(node_buffer);
+                    node = uint256_to_bool_vector(node_uint256);
+
+                    M_account.push_back(node);
+                }
+
+                //Done
+                break;
+            }
+            else
+            {
+                if ((next - start) > 66)
+                {//Malformed M_account
+                    return -2;
+                }
+                strncpy(node_buffer, start, next - start);
+                node_uint256.SetHex(node_buffer);
+                node = uint256_to_bool_vector(node_uint256);
+
+                M_account.push_back(node);
+
+                //Look for next
+                start = next + 1;
+            }
+        }
+        if (M_account.size() != 160)
+        {//Malformed M_account
+            return -3;
+        }
+    }
 
     // std::string GTMWPath(path);
     // GTMWPath.append(argv[4]);
     // std::string WHex;
     // loadFromFile(GTMWPath, WHex);
-    std::string WHex(CARP);
+    uint256 W;
+    int ret = calculate_Merkle_root(A_account_LSB, leaf, M_account, W);
+    std::string WHex = W.GetHex();
 
     std::string V_accountHex;//V_account == keccak256(P_proof, keccak256(W,r_account)
     {
@@ -2272,7 +2371,7 @@ extern "C" int prove_membership_with_files(const char* path, int argc, const cha
         }
     }
 
-    int ret = prove_membership(
+    ret = prove_membership(
         WHex.c_str(),
         N_account,
         V_accountHex.c_str(),
