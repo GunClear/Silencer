@@ -212,6 +212,57 @@ public:
 #endif
     }
 
+    static void calculateMerkleRoot(
+        const libff::bit_vector& A_account,
+        const libff::bit_vector& leaf,
+        const std::vector<gunero_merkle_authentication_node>& M_account,
+        libff::bit_vector& W
+    )
+    {
+#ifdef DEBUG
+        libff::print_header("Gunero calculateMerkleRoot()");
+#endif
+        assert(M_account.size() == tree_depth);
+
+        // libff::bit_vector prev_hash(HashT::get_digest_len());
+        // std::generate(prev_hash.begin(), prev_hash.end(), [&]() { return std::rand() % 2; });
+        // leaf = prev_hash;
+        assert(leaf.size() == HashT::get_digest_len());
+        libff::bit_vector prev_hash = leaf;
+
+        // libff::bit_vector address_bits;
+        assert(A_account.size() == tree_depth);
+
+        // size_t address = 0;
+        for (long level = tree_depth-1; level >= 0; --level)
+        {
+            //A_account is accessed LSB but is processed as MSB (root) to LSB (leaf)
+            bool parameter_is_left = A_account.at(tree_depth-1-level);
+
+            // //Generate random uncle
+            // libff::bit_vector uncle(HashT::get_digest_len());
+            // std::generate(uncle.begin(), uncle.end(), [&]() { return std::rand() % 2; });
+            libff::bit_vector uncle = M_account[level];
+
+            //Create block of prev_hash + uncle
+            libff::bit_vector block = prev_hash;
+            block.insert((!parameter_is_left) ? block.begin() : block.end(), uncle.begin(), uncle.end());
+            //Compress block to new hash
+            libff::bit_vector h = HashT::get_hash(block);
+
+            // //Add uncle to path
+            // M_account[level] = uncle;
+
+            prev_hash = h;
+        }
+
+        W = prev_hash;
+
+#ifdef DEBUG
+        printf("\n"); libff::print_indent(); libff::print_mem("after calculateMerkleRoot()"); libff::print_time("after calculateMerkleRoot()");
+#endif
+    }
+
     bool prove(
         const uint256& pW,
         const uint8_t& pN_account,

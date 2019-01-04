@@ -157,6 +157,23 @@ public:
     void generate_r1cs_witness();
 };
 
+template<typename FieldT>
+class keccak256_message_schedule_gadget : public gadget<FieldT> {
+public:
+    std::vector<pb_variable_array<FieldT> > A_bits;
+    std::vector<std::shared_ptr<packing_gadget<FieldT> > > pack_A;
+
+public:
+    pb_variable_array<FieldT> A;
+    pb_variable_array<FieldT> packed_A;
+    keccak256_message_schedule_gadget(protoboard<FieldT> &pb,
+                                   const pb_variable_array<FieldT> &A,
+                                   const pb_variable_array<FieldT> &packed_A,
+                                   const std::string &annotation_prefix);
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
 // ========================================================================================
 // keccakf1600 algorithm
 // ========================================================================================
@@ -171,6 +188,9 @@ public:
     std::vector<std::vector<std::shared_ptr<pb_linear_combination_array<FieldT>>>> round_As;
     std::vector<keccakf1600_round_gadget<FieldT>> round_functions;
 
+    pb_variable_array<FieldT> packed_A;
+    std::shared_ptr<keccak256_message_schedule_gadget<FieldT> > message_schedule;
+
 public:
     block_variable<FieldT> input;
     digest_variable<FieldT> output;
@@ -181,23 +201,6 @@ public:
                 const digest_variable<FieldT> &output,
                 const std::string &annotation_prefix);
 
-    void generate_r1cs_constraints();
-    void generate_r1cs_witness();
-};
-
-template<typename FieldT>
-class keccak256_message_schedule_gadget : public gadget<FieldT> {
-public:
-    std::vector<pb_variable_array<FieldT> > A_bits;
-    std::vector<std::shared_ptr<packing_gadget<FieldT> > > pack_A;
-
-public:
-    pb_variable_array<FieldT> A;
-    pb_variable_array<FieldT> packed_A;
-    keccak256_message_schedule_gadget(protoboard<FieldT> &pb,
-                                   const pb_variable_array<FieldT> &A,
-                                   const pb_variable_array<FieldT> &packed_A,
-                                   const std::string &annotation_prefix);
     void generate_r1cs_constraints();
     void generate_r1cs_witness();
 };

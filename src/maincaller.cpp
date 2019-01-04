@@ -2,6 +2,8 @@
 #include "uint252.h"
 #include "util.h"
 #include "serialize.h"
+#include <sstream>
+#include <string>
 #include "keccak_gadget.hpp"
 #include "GuneroProof.hpp"
 #include "GuneroMembershipCircuit.hpp"
@@ -104,6 +106,8 @@ extern "C" int prove_receive(
 //Full test
 extern "C" int full_test(const char* path);
 
+extern "C" int prove_membership_with_files(const char* path, int argc, const char* argv[]);
+
 //Test Keccak hash
 extern "C" int test_keccak(
     const char* LeftHex,
@@ -119,6 +123,9 @@ extern "C" int test_sha3_256(
     char* HashHex,
     const unsigned int HashHexSize
     );
+
+//
+extern "C" int create_Merkle_root();
 
 int get_executable_path(char* pBuf, const int len)
 {
@@ -160,28 +167,56 @@ int main(int argc, const char* argv[])
         // argv_n[1] = "9";
         // return main(2, argv_n);
 
-        uint256 left;
-        std::string leftString = left.GetHex();
-        printf("left:\t%s\n", leftString.c_str());
 
-        uint256 right;
-        std::string rightString = right.GetHex();
-        printf("right:\t%s\n", rightString.c_str());
 
-        const int len = (256/4) + 1;
-        char hashHex[len];
+        // uint256 left;
+        // std::string leftString = left.GetHex();
+        // printf("left:\t%s\n", leftString.c_str());
 
-        int ret = test_keccak(
-            leftString.c_str(),
-            rightString.c_str(),
-            hashHex,
-            len
-        );
+        // uint256 right;
+        // std::string rightString = right.GetHex();
+        // printf("right:\t%s\n", rightString.c_str());
 
-        printf("hash:\t%s\n", hashHex);
-        printf("ret:\t%d\n", ret);
+        // const int len = (256/4) + 1;
+        // char hashHex[len];
 
-        return 0;
+        // int ret = test_keccak(
+        //     leftString.c_str(),
+        //     rightString.c_str(),
+        //     hashHex,
+        //     len
+        // );
+
+        // printf("hash:\t%s\n", hashHex);
+        // printf("ret:\t%d\n", ret);
+
+        // return 0;
+
+
+
+        // int ret = create_Merkle_root();
+        // return ret;
+
+
+        const int len = 4096;
+        char pBuf[len];
+        char *path = NULL;
+        if (get_executable_path(pBuf, len))
+        {
+            path = pBuf;
+            char *last_slash = strrchr(path, '/');
+            if (last_slash)
+            {
+                *(last_slash + 1) = '\0';
+            }
+        }
+        else
+        {
+            printf("\nUnable to discover root path!\n");
+            return -1;
+        }
+
+        prove_membership_with_files(path, 4, 0);
     }
 
     const int len = 4096;
@@ -543,6 +578,16 @@ int main(int argc, const char* argv[])
             printf("true");
         }
         printf("\n");
+
+        return ret;
+    }
+
+    //prove_membership_with_files
+    if ((std::string(argv[1]) == "10") && (argc >= 4))
+    {
+        printf("\nprove_membership_with_files\n");
+
+        int ret = prove_membership_with_files(path, argc, argv);
 
         return ret;
     }

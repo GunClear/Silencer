@@ -443,8 +443,8 @@ keccakf1600_gadget<FieldType>::keccakf1600_gadget(protoboard<FieldType> &pb,
 #endif
 
     // /* message schedule and inputs for it */
-    // packed_A.allocate(pb, 25, FMT(this->annotation_prefix, " packed_A"));
-    // message_schedule.reset(new keccakf1600_message_schedule_gadget<FieldType>(pb, new_block, packed_A, FMT(this->annotation_prefix, " message_schedule")));
+    packed_A.allocate(pb, 25, FMT(this->annotation_prefix, " packed_A"));
+    message_schedule.reset(new keccak256_message_schedule_gadget<FieldType>(pb, input.bits, packed_A, FMT(this->annotation_prefix, " message_schedule")));
 
     // Absorb input
     // N/A
@@ -520,15 +520,7 @@ keccakf1600_gadget<FieldType>::keccakf1600_gadget(protoboard<FieldType> &pb,
 template<>
 void keccakf1600_gadget<FieldType>::generate_r1cs_constraints()
 {
-    //input.generate_r1cs_constraints();
-
-    // for (size_t i = 0; i < 25; ++i)
-    // {
-    //     for (size_t j = 0; j < 25; ++j)
-    //     {
-    //         round_As[i][j]->generate_r1cs_constraints();
-    //     }
-    // }
+    message_schedule->generate_r1cs_constraints();
 
     for (size_t i = 0; i < 24; ++i)
     {
@@ -539,18 +531,11 @@ void keccakf1600_gadget<FieldType>::generate_r1cs_constraints()
 template<>
 void keccakf1600_gadget<FieldType>::generate_r1cs_witness()
 {
-    // /* message schedule and inputs for it */
-    // packed_A.allocate(pb, 25, FMT(this->annotation_prefix, " packed_A"));
-    // message_schedule.reset(new keccakf1600_message_schedule_gadget<FieldType>(pb, new_block, packed_A, FMT(this->annotation_prefix, " message_schedule")));
+    message_schedule->generate_r1cs_witness();
 
-    // Absorb input
-    // N/A
-
-    //Was: pb_linear_combination_array<FieldT> x
-    //Is:  pb_variable_array<FieldT> bits -> pb_variable<FieldT>
+    //libff::bit_vector input_bits = packed_A.get_bits(pb);
 
     libff::bit_vector input_bits = input.bits.get_bits(pb);
-
     unsigned long input_array[17];
     for (size_t i = 0; i < 17; ++i)
     {
@@ -563,18 +548,19 @@ void keccakf1600_gadget<FieldType>::generate_r1cs_witness()
 
     // Xor in the DS and pad frame.
     // a[inlen] ^= delim;
-    {
-        size_t i = input_bits.size() / 64;
-        size_t j = input_bits.size() % 64;
-        if (j > (64 - 8))
-        {//Must span multiple WORDs
-			throw std::runtime_error("Odd size input not implemented!");
-        }
-        else
-        {//Stored in single WORD
-            input_array[i] ^= delim << (64 - 8 - j);
-        }
-    }
+    // {
+    //     size_t i = input_bits.size() / 64;
+    //     size_t j = input_bits.size() % 64;
+    //     if (j > (64 - 8))
+    //     {//Must span multiple WORDs
+	// 		throw std::runtime_error("Odd size input not implemented!");
+    //     }
+    //     else
+    //     {//Stored in single WORD
+    //         input_array[i] ^= ((unsigned long)delim) << (56 - j);//64 - 8
+    //     }
+    // }
+    input_array[8] = ((unsigned long)delim) << 56;
 
     for (size_t i = 0; i < 17; ++i)
     {
